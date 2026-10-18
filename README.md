@@ -34,6 +34,18 @@ Ingresá con el administrador, andá a **Cargar planilla** y subí el CSV.
 
 Seguridad de la base: las tablas tienen RLS habilitado **sin políticas**. La app entra con el rol `postgres` por la cadena de conexión, mientras que la API REST pública de Supabase (anon key) no puede leer nada. Las vistas usan `security_invoker`.
 
+## Diagnóstico
+
+Abrí `https://<tu-app>/api/salud` (no requiere sesión). Devuelve un JSON que indica:
+
+- si `DATABASE_URL` apunta al pooler de Supabase, con el usuario `postgres.<ref>` y sin la clave de ejemplo;
+- si `AUTH_SECRET` es válido;
+- si la base conecta, cuánto tarda, cuántos administradores hay y si están aplicadas las migraciones.
+
+Si algo falla, el campo `base.motivo` explica la causa. No muestra secretos ni la cadena de conexión.
+
+Si el ingreso no funciona, la pantalla de login también muestra el motivo y un código: `28P01` es una clave de base incorrecta y `CONNECT_TIMEOUT` es un host equivocado o inaccesible.
+
 ## Usuarios
 
 - **Ingreso.** Con usuario y clave. La clave se guarda con bcrypt y la sesión es un JWT firmado en una cookie `httpOnly` que dura 8 horas. En cada página se vuelve a verificar contra la base que el usuario siga activo, así que desactivar a alguien corta su acceso de inmediato.

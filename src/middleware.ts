@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_SESION, verificarSesion } from "./lib/token";
 
 // Rutas accesibles sin sesión.
-const PUBLICAS = [/^\/login$/, /^\/invitacion\/[^/]+$/];
+const PUBLICAS = [/^\/login$/, /^\/invitacion\/[^/]+$/, /^\/api\/salud$/];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

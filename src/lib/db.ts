@@ -10,7 +10,9 @@ function crear() {
     prepare: false,
     max: process.env.NODE_ENV === "production" ? 3 : 5,
     idle_timeout: 20,
-    connect_timeout: 15,
+    // Fallar rápido (y mostrar el motivo) en vez de dejar la pantalla esperando.
+    connect_timeout: 8,
+    max_lifetime: 60 * 10,
     onnotice: () => {},
     types: {
       // numeric y bigint como number; fechas como texto 'YYYY-MM-DD' para no correr el día por zona horaria.
