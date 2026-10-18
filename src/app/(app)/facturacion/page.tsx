@@ -1,6 +1,6 @@
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
-import type { SearchParams } from "@/lib/filtros";
+import { textoAnios, type SearchParams } from "@/lib/filtros";
 import { fecha, gs, gsCorto, horas, num } from "@/lib/formato";
 import { facturacion, fase, indice } from "@/lib/reportes";
 
@@ -17,6 +17,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const ahorr = d.total.horas_ahorradas + t.total.horas_ahorradas;
   const factDesest = periodos.reduce((s, p) => s + p.total_desestimados, 0);
   const nDesest = periodos.reduce((s, p) => s + p.desestimados, 0);
+  const totDesa = periodos.reduce((s, p) => s + p.importe_desa, 0);
+  const totTest = periodos.reduce((s, p) => s + p.importe_test, 0);
+  const totTestCliente = periodos.reduce((s, p) => s + p.importe_test_cliente, 0);
 
   const lectura = [
     `La facturación se calcula sobre horas presupuestadas, no sobre horas trabajadas.`,
@@ -25,10 +28,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
   return (
     <>
-      <Encabezado titulo={`Facturación ${f.anio}`} op={op} f={f}
+      <Encabezado titulo={`Facturación ${textoAnios(f)}`} op={op} f={f}
         bajada="SGR implementados en el año, agrupados por fecha de facturación. Las horas facturadas son las presupuestadas de cada fase." />
       <section className="banda">
         <Indicador nombre="Total facturado" valor={gsCorto(total)} nota={`${num(periodos.reduce((s, p) => s + p.sgr, 0))} SGR`} />
+        <Indicador nombre="Desarrollo" valor={gsCorto(totDesa)} nota="SGR con presupuesto de desarrollo" />
+        <Indicador nombre="Testing (servicio adicional)" valor={gsCorto(totTest)} nota={`${gsCorto(totTestCliente)} sobre desarrollos del cliente`} />
         <Indicador nombre="Sin fecha de facturación" valor={gsCorto(pendientes?.total ?? 0)} nota={`${num(pendientes?.sgr ?? 0)} SGR`} />
         <Indicador nombre="Horas trabajadas no facturadas" valor={horas(exced)} nota="excedente sobre lo presupuestado" />
         <Indicador nombre="Horas presupuestadas no usadas" valor={horas(ahorr)} nota="SGR terminados por debajo" />
@@ -63,8 +68,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
                 <td>Total</td>
                 <td className="n">{num(periodos.reduce((s, p) => s + p.sgr, 0))}</td>
                 <td className="n">{num(nDesest)}</td>
-                <td className="n">{gs(periodos.reduce((s, p) => s + p.importe_desa, 0))}</td>
-                <td className="n">{gs(periodos.reduce((s, p) => s + p.importe_test, 0))}</td>
+                <td className="n">{gs(totDesa)}</td>
+                <td className="n">{gs(totTest)}</td>
                 <td className="n">{gs(total)}</td>
                 <td className="n">{horas(periodos.reduce((s, p) => s + p.horas_presu, 0))}</td>
                 <td className="n">{horas(periodos.reduce((s, p) => s + p.horas_real, 0))}</td>
@@ -75,7 +80,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           </table>
         </div>
         <p className="debil" style={{ marginTop: 12, fontSize: "0.82rem" }}>
-          Los importes de desarrollo de los equipos DITA y DPJ sin horas presupuestadas de desarrollo no se cuentan en la columna Desarrollo; el total sí respeta el «Total a facturar» de la planilla.
+          La columna Desarrollo solo suma SGR con horas presupuestadas de desarrollo; Testing incluye el servicio sobre desarrollos de Onnix y del cliente. El total respeta el «Total a facturar» de la planilla.
         </p>
       </section>
     </>

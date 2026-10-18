@@ -1,25 +1,27 @@
 import { BarraLibro, BarrasAcumulado, BarrasPresuReal, Dispersion, Distribucion } from "./graficos";
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "./ui";
 import { contextoReporte } from "@/lib/contexto";
-import type { SearchParams } from "@/lib/filtros";
-import { dias, horas, nombreMes, num, pct } from "@/lib/formato";
+import { textoAnios, type SearchParams } from "@/lib/filtros";
+import { dias, horas, num, pct } from "@/lib/formato";
 import { lecturaFase } from "@/lib/lectura";
 import { fase, indice, pctPausa, type Fase } from "@/lib/reportes";
 
 const TEXTO = {
   desa: {
     titulo: "Desarrollo",
+    tituloLargo: "Desarrollo",
     persona: "Desarrollador",
     color: "var(--desa)",
     bajada:
-      "Cada SGR se mide entre su fecha de inicio y fin de desarrollo. En los equipos DITA y DPJ el desarrollo lo hace el cliente, así que solo se incluye si el SGR tiene horas presupuestadas de desarrollo.",
+      "Solo son desarrollos de Onnix los SGR con horas presupuestadas de desarrollo, en cualquier equipo; sin presupuesto de desarrollo no cuentan aunque tengan horas cargadas. Cada SGR se mide entre su fecha de inicio y fin de desarrollo.",
   },
   test: {
     titulo: "Testing",
+    tituloLargo: "Testing como servicio adicional",
     persona: "Tester",
     color: "var(--test)",
     bajada:
-      "Cada SGR se mide entre su fecha de inicio y fin de testing, que no necesariamente sigue al fin de desarrollo. Incluye todos los equipos, también DITA y DPJ.",
+      "Testing es un servicio adicional: se presta sobre desarrollos de Onnix y sobre desarrollos internos del cliente (por ejemplo, equipos DITA y DPJ). Cada SGR se mide entre su fecha de inicio y fin de testing, que no necesariamente sigue al fin de desarrollo.",
   },
 } as const;
 
@@ -27,20 +29,33 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
   const { sesion, op, f, vacio } = await contextoReporte(searchParams);
   if (vacio) return <SinDatos esAdmin={sesion.rol === "admin"} />;
   const t = TEXTO[fz];
-  const { total, responsables, mensual, puntos } = await fase(fz, f);
+  const { total, responsables, mensual, puntos, sinPresu } = await fase(fz, f);
+  const esTest = fz === "test";
   const conHoras = total.sgr - total.sin_registro;
   const maxBarra = Math.max(1, ...responsables.map((r) => Math.max(r.horas_real, r.horas_presu)));
 
-  let acc = 0;
-  const entregas = mensual.map((m) => ({ etiqueta: nombreMes(m.mes), valor: m.sgr, acumulado: (acc += m.sgr) }));
+  let acc = 0, grupo: number | null = null;
+  const entregas = mensual.map((m) => {
+    if (m.anio !== grupo) { grupo = m.anio; acc = 0; } // acumulado por año; "Previo" va aparte
+    acc += m.sgr;
+    return { etiqueta: m.etiqueta, segmentos: esTest ? [m.sgr - m.solo_test, m.solo_test] : [m.sgr], acumulado: acc, grupo: m.anio };
+  });
+  const seriesEntregas = esTest
+    ? [{ nombre: "Sobre desarrollos de Onnix", color: t.color },
+       { nombre: "Sobre desarrollos del cliente", color: "color-mix(in srgb, var(--test) 45%, var(--superficie))", colorTexto: "var(--tinta)" }]
+    : [{ nombre: "Desarrollos con fin de desarrollo en el mes", color: t.color }];
 
   return (
     <>
-      <Encabezado titulo={`${t.titulo} ${f.anio}`} bajada={t.bajada} op={op} f={f} />
+      <Encabezado titulo={`${t.tituloLargo} ${textoAnios(f)}`} bajada={t.bajada} op={op} f={f} />
 
       <section className="banda" aria-label={`Indicadores de ${t.titulo.toLowerCase()}`}>
         <Indicador nombre="SGR entregados" valor={num(total.entregados)}
-          nota={[total.desestimados ? `+${total.desestimados} desestimados` : "", total.sin_registro ? `${total.sin_registro} sin horas cargadas` : ""].filter(Boolean).join("; ") || undefined} />
+          nota={[
+            esTest ? `${num(total.entregados - total.solo_test_entregados)} de Onnix, ${num(total.solo_test_entregados)} del cliente` : "",
+            total.desestimados ? `+${total.desestimados} desestimados` : "",
+            total.sin_registro ? `${total.sin_registro} sin horas cargadas` : "",
+          ].filter(Boolean).join("; ") || undefined} />
         <Indicador nombre="Horas trabajadas" valor={horas(total.real_reg)} nota={`de ${horas(total.presu_reg)} presupuestadas`} />
         <Indicador nombre="Índice de cumplimiento" valor={<EtiquetaIndice valor={indice(total)} />} nota="presupuestadas ÷ trabajadas" />
         <Indicador nombre="Dentro del presupuesto" valor={conHoras ? pct(total.dentro / conHoras) : "–"} nota={`${num(total.dentro)} de ${num(conHoras)} SGR`} />
@@ -49,6 +64,12 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
       </section>
 
       <Lectura parrafos={lecturaFase(fz, total, responsables)} fase={fz} />
+      {!esTest && sinPresu.sgr > 0 && (
+        <p className="aviso info">
+          {num(sinPresu.sgr)} SGR de equipos de Onnix tienen {horas(sinPresu.horas)} de desarrollo cargadas sin horas presupuestadas de desarrollo.
+          No se cuentan como desarrollos entregados ni suman horas en este reporte.
+        </p>
+      )}
 
       <section className="panel">
         <div className="panel-cab">
@@ -61,6 +82,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
               <tr>
                 <th>{t.persona}</th>
                 <th className="n">SGR entregados</th>
+                {esTest && <th className="n" title="SGR sobre desarrollos internos del cliente">Del cliente</th>}
                 <th className="n">Trabajadas</th>
                 <th className="n">Presupuestadas</th>
                 <th aria-label="Comparación gráfica" />
@@ -85,6 +107,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
                       {r.desestimados > 0 && <span className="debil" title="Desestimados por el cliente"> +{r.desestimados} desest.</span>}
                       {r.sin_registro > 0 && <span className="debil" title="SGR sin horas cargadas"> ({r.sin_registro} s/h)</span>}
                     </td>
+                    {esTest && <td className="n">{r.solo_test ? num(r.solo_test) : ""}</td>}
                     <td className="n">{horas(r.horas_real)}</td>
                     <td className="n">{horas(r.horas_presu)}</td>
                     <td><BarraLibro real={r.horas_real} presu={r.horas_presu} max={maxBarra} color={t.color} /></td>
@@ -106,6 +129,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
               <tr>
                 <td>Total</td>
                 <td className="n">{num(total.entregados)}{total.desestimados > 0 && <span className="debil"> +{total.desestimados}</span>}</td>
+                {esTest && <td className="n">{num(total.solo_test)}</td>}
                 <td className="n">{horas(total.horas_real)}</td>
                 <td className="n">{horas(total.horas_presu)}</td>
                 <td />
@@ -132,9 +156,9 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
         <section className="panel">
           <div className="panel-cab">
             <h2>SGR con {t.titulo.toLowerCase()} terminado, por mes</h2>
-            <p>Según la fecha de fin de {fz === "desa" ? "desarrollo" : "testing"}.{mensual.some((m) => m.mes === 0) && " «Previo» agrupa los que terminaron antes del año."}</p>
+            <p>Según la fecha de fin de {fz === "desa" ? "desarrollo" : "testing"}.{mensual.some((m) => m.previo) && " «Previo» agrupa los que terminaron antes del período elegido."}</p>
           </div>
-          <BarrasAcumulado datos={entregas} color={t.color} />
+          <BarrasAcumulado datos={entregas} series={seriesEntregas} />
         </section>
         <section className="panel">
           <div className="panel-cab">
@@ -144,7 +168,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
           <Distribucion dentro={total.dentro} leve={total.leve} sobre={total.sobre} sinRegistro={total.sin_registro} />
           <h3 style={{ marginTop: 24 }}>Horas por mes de fin de fase</h3>
           <BarrasPresuReal color={t.color}
-            datos={mensual.map((m) => ({ etiqueta: nombreMes(m.mes), presu: m.horas_presu, real: m.horas_real }))} />
+            datos={mensual.map((m) => ({ etiqueta: m.etiqueta, presu: m.horas_presu, real: m.horas_real }))} />
         </section>
       </div>
 

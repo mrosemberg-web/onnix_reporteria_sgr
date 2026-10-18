@@ -2,7 +2,8 @@ import Link from "next/link";
 import { BarraLibro } from "@/components/graficos";
 import { Encabezado, EtiquetaIndice, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
-import { aQuery, type SearchParams } from "@/lib/filtros";
+import { aQuery, textoAnios, type SearchParams } from "@/lib/filtros";
+import { nombreServicio } from "@/lib/servicios";
 import { dias, gs, horas, num, pct } from "@/lib/formato";
 import { desglose, indice, type Dimension } from "@/lib/reportes";
 
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Por área y tipo" };
 
 const DIMS: { clave: Dimension; texto: string; singular: string }[] = [
+  { clave: "servicio", texto: "Servicio", singular: "Servicio" },
   { clave: "tipo_requerimiento", texto: "Tipo de requerimiento", singular: "Tipo" },
   { clave: "departamento", texto: "Departamento", singular: "Departamento" },
   { clave: "equipo", texto: "Equipo", singular: "Equipo" },
@@ -27,8 +29,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
   return (
     <>
-      <Encabezado titulo={`Por área y tipo ${f.anio}`} op={op} f={f}
-        bajada="Dónde se concentra el trabajo y cómo rinde el presupuesto en cada segmento. Las horas suman desarrollo y testing con las reglas de cada equipo." />
+      <Encabezado titulo={`Por área y tipo ${textoAnios(f)}`} op={op} f={f}
+        bajada="Dónde se concentra el trabajo y cómo rinde el presupuesto en cada segmento. «Desarrollos» son SGR con presupuesto de desarrollo; «Solo testing» es el servicio de testing sobre desarrollos internos del cliente." />
       <nav className="acciones-fila no-imprimir" aria-label="Agrupar por">
         {DIMS.map((d) => (
           <Link key={d.clave} href={`/desglose?${aQuery(f)}&por=${d.clave}`}
@@ -44,7 +46,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <table>
             <thead>
               <tr>
-                <th>{dim.singular}</th><th className="n">SGR entregados</th><th className="n">Trabajadas</th><th className="n">Presupuestadas</th>
+                <th>{dim.singular}</th><th className="n">Desarrollos entregados</th><th className="n" title="Testing sobre desarrollos internos del cliente">Solo testing</th><th className="n">Trabajadas</th><th className="n">Presupuestadas</th>
                 <th aria-label="Comparación gráfica" /><th className="n">Índice</th><th className="n">Facturado</th>
                 <th className="n">Parte del total</th><th className="n">Devueltos al cliente</th><th className="n">Entrega mediana</th>
               </tr>
@@ -52,8 +54,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
             <tbody>
               {filas.map((r) => (
                 <tr key={r.clave}>
-                  <td>{r.clave}</td>
-                  <td className="n">{num(r.entregados)}{r.desestimados > 0 && <span className="debil" title="Desestimados por el cliente"> +{r.desestimados} desest.</span>}</td>
+                  <td>{dim.clave === "servicio" ? nombreServicio(r.clave) : r.clave}</td>
+                  <td className="n">{r.desarrollos ? num(r.desarrollos) : ""}{r.desestimados > 0 && <span className="debil" title="Desestimados por el cliente"> +{r.desestimados} desest.</span>}</td>
+                  <td className="n">{r.solo_test ? num(r.solo_test) : ""}</td>
                   <td className="n">{horas(r.horas_real)}</td>
                   <td className="n">{horas(r.horas_presu)}</td>
                   <td><BarraLibro real={r.horas_real} presu={r.horas_presu} max={max} color="var(--desa)" /></td>

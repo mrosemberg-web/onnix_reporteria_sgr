@@ -1,19 +1,29 @@
 import "server-only";
 import { sql } from "./db";
 import { EQUIPO_EXTERNOS, EQUIPO_PROPIOS, type Filtros } from "./filtros";
+import { ORDEN_SERVICIOS } from "./servicios";
+import { claveDestino, construirMeses, type Mes } from "./meses";
 
 export type Fase = "desa" | "test";
 
 /** Tolerancia para considerar un desvío "leve" (10 % sobre lo presupuestado). */
 export const TOLERANCIA = 0.1;
 
-const filtro = (f: Filtros) => sql`
-  extract(year from implementacion) = ${f.anio}
-  ${f.equipo === EQUIPO_PROPIOS ? sql`and not equipo_externo`
-    : f.equipo === EQUIPO_EXTERNOS ? sql`and equipo_externo`
-    : f.equipo ? sql`and equipo = ${f.equipo}` : sql``}
-  ${f.tipo ? sql`and tipo_requerimiento = ${f.tipo}` : sql``}
-  ${f.estado ? sql`and estado = ${f.estado}` : sql``}`;
+// Filtros con varios valores: dentro de un mismo filtro es "o", entre filtros es "y".
+const filtro = (f: Filtros) => {
+  const eq = [];
+  if (f.equipos.includes(EQUIPO_PROPIOS)) eq.push(sql`not equipo_externo`);
+  if (f.equipos.includes(EQUIPO_EXTERNOS)) eq.push(sql`equipo_externo`);
+  const nombres = f.equipos.filter((e) => e !== EQUIPO_PROPIOS && e !== EQUIPO_EXTERNOS);
+  if (nombres.length) eq.push(sql`equipo in ${sql(nombres)}`);
+  const equipos = eq.length ? eq.reduce((a, b) => sql`${a} or ${b}`) : null;
+  return sql`
+    extract(year from implementacion)::int in ${sql(f.anios)}
+    ${equipos ? sql`and (${equipos})` : sql``}
+    ${f.tipos.length ? sql`and tipo_requerimiento in ${sql(f.tipos)}` : sql``}
+    ${f.estados.length ? sql`and estado in ${sql(f.estados)}` : sql``}
+    ${f.servicios.length ? sql`and servicio in ${sql(f.servicios)}` : sql``}`;
+};
 
 // ---------------------------------------------------------------------------
 // Agregado estándar por fase. "real_reg"/"presu_reg" solo consideran SGR con
@@ -23,6 +33,8 @@ const aggFase = () => sql`
   count(*) as sgr,
   count(*) filter (where entregado) as entregados,
   count(*) filter (where desestimado) as desestimados,
+  count(*) filter (where servicio = 'solo_test') as solo_test,
+  count(*) filter (where servicio = 'solo_test' and entregado) as solo_test_entregados,
   coalesce(sum(horas_real), 0)::float8 as horas_real,
   coalesce(sum(horas_presu), 0)::float8 as horas_presu,
   coalesce(sum(horas_real) filter (where horas_real > 0), 0)::float8 as real_reg,
@@ -43,7 +55,7 @@ const aggFase = () => sql`
   coalesce(sum(importe), 0)::float8 as importe`;
 
 export type AggFase = {
-  sgr: number; entregados: number; desestimados: number; horas_real: number; horas_presu: number; real_reg: number; presu_reg: number;
+  sgr: number; entregados: number; desestimados: number; solo_test: number; solo_test_entregados: number; horas_real: number; horas_presu: number; real_reg: number; presu_reg: number;
   dentro: number; leve: number; sobre: number; sin_registro: number;
   horas_excedidas: number; horas_ahorradas: number; horas_pausadas: number;
   devoluciones: number; sgr_con_devolucion: number;
@@ -52,7 +64,7 @@ export type AggFase = {
 };
 
 export const AGG_VACIO: AggFase = {
-  sgr: 0, entregados: 0, desestimados: 0, horas_real: 0, horas_presu: 0, real_reg: 0, presu_reg: 0, dentro: 0, leve: 0, sobre: 0,
+  sgr: 0, entregados: 0, desestimados: 0, solo_test: 0, solo_test_entregados: 0, horas_real: 0, horas_presu: 0, real_reg: 0, presu_reg: 0, dentro: 0, leve: 0, sobre: 0,
   sin_registro: 0, horas_excedidas: 0, horas_ahorradas: 0, horas_pausadas: 0, devoluciones: 0,
   sgr_con_devolucion: 0, dias_cal_med: null, dias_netos_med: null, dias_cal_sum: 0, dias_pausa_sum: 0, importe: 0,
 };
@@ -64,11 +76,12 @@ export const pctPausa = (a: AggFase) => (a.dias_cal_sum > 0 ? a.dias_pausa_sum /
 // ---------------------------------------------------------------------------
 
 export async function opciones() {
-  const [anios, equipos, tipos, estados, [carga]] = await Promise.all([
+  const [anios, equipos, tipos, estados, servicios, [carga]] = await Promise.all([
     sql<{ anio: number }[]>`select distinct extract(year from implementacion)::int as anio from requerimientos where implementacion is not null order by 1 desc`,
     sql<{ v: string }[]>`select distinct equipo as v from requerimientos where equipo is not null order by 1`,
     sql<{ v: string }[]>`select distinct tipo_requerimiento as v from requerimientos where tipo_requerimiento is not null order by 1`,
     sql<{ v: string }[]>`select distinct estado as v from requerimientos where estado is not null order by 1`,
+    sql<{ v: string }[]>`select distinct servicio as v from v_requerimientos`,
     sql<{ archivo: string; filas: number; cargado_en: Date; nombre: string | null }[]>`
       select c.archivo, c.filas, c.cargado_en, u.nombre from cargas c left join usuarios u on u.id = c.cargado_por
       order by c.id desc limit 1`,
@@ -78,43 +91,47 @@ export async function opciones() {
     equipos: equipos.map((r) => r.v),
     tipos: tipos.map((r) => r.v),
     estados: estados.map((r) => r.v),
+    servicios: ORDEN_SERVICIOS.filter((x) => servicios.some((r) => r.v === x)),
     ultimaCarga: carga ?? null,
   };
 }
 
-/** Último mes a mostrar: mes en curso si es el año actual, diciembre si es un año cerrado. */
-function ultimoMes(anio: number) {
-  const tz = process.env.APP_TZ || "America/Asuncion";
-  const partes = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "numeric" }).formatToParts(new Date());
-  const a = Number(partes.find((p) => p.type === "year")?.value);
-  const m = Number(partes.find((p) => p.type === "month")?.value);
-  if (anio < a) return 12;
-  if (anio === a) return m;
-  return 1;
-}
-
 export type KpisReq = {
   sgr: number; entregados: number; sgr_pap: number; desestimados: number;
-  horas_desestimados: number; facturado_desestimados: number; devoluciones_sin_pausa: number; sgr_desa: number; sgr_test: number; facturado: number; pendiente_facturar: number;
-  sgr_pendiente_facturar: number; devoluciones: number; sgr_con_devolucion: number;
+  desarrollos_entregados: number; testing_entregados: number; testing_onnix: number; testing_cliente: number;
+  desa_sin_presu: number; horas_desa_sin_presu: number;
+  horas_desestimados: number; facturado_desestimados: number; devoluciones_sin_pausa: number;
+  facturado: number; facturado_desa: number; facturado_test: number; facturado_test_cliente: number;
+  pendiente_facturar: number; sgr_pendiente_facturar: number; devoluciones: number; sgr_con_devolucion: number;
   lead_cal_med: number | null; lead_neto_med: number | null; horas_pausadas: number;
   horas_real_total: number; horas_presu_total: number;
 };
 
+export type MesResumen = Mes & {
+  desarrollos: number; solo_test: number; acumulado_desa: number;
+  facturado: number; horas_presu: number; horas_real: number;
+};
+
 export async function resumen(f: Filtros) {
-  const hasta = ultimoMes(f.anio);
-  const [[kpis], fases, mensual] = await Promise.all([
+  const [[kpis], fases, porMes] = await Promise.all([
     sql<KpisReq[]>`
       select count(*) as sgr,
              count(*) filter (where entregado) as entregados,
              count(*) filter (where upper(trim(estado)) = 'PAP') as sgr_pap,
              count(*) filter (where desestimado) as desestimados,
+             count(*) filter (where entregado and aplica_desa) as desarrollos_entregados,
+             count(*) filter (where entregado and aplica_test) as testing_entregados,
+             count(*) filter (where entregado and servicio = 'desa_test') as testing_onnix,
+             count(*) filter (where entregado and servicio = 'solo_test') as testing_cliente,
+             count(*) filter (where desa_sin_presu) as desa_sin_presu,
+             coalesce(sum(horas_desa) filter (where desa_sin_presu), 0)::float8 as horas_desa_sin_presu,
              coalesce(sum(horas_real_total) filter (where desestimado), 0)::float8 as horas_desestimados,
              coalesce(sum(total_facturar) filter (where desestimado), 0)::float8 as facturado_desestimados,
              count(*) filter (where devoluciones > 0 and horas_pausadas = 0) as devoluciones_sin_pausa,
-             count(*) filter (where aplica_desa) as sgr_desa,
-             count(*) filter (where aplica_test) as sgr_test,
              coalesce(sum(total_facturar), 0)::float8 as facturado,
+             coalesce(sum(importe_desa) filter (where aplica_desa), 0)::float8 as facturado_desa,
+             coalesce(sum(importe_test) filter (where aplica_test), 0)::float8 as facturado_test,
+             coalesce(sum(importe_test) filter (where servicio = 'solo_test'), 0)::float8 as facturado_test_cliente,
              coalesce(sum(total_facturar) filter (where fecha_facturacion is null), 0)::float8 as pendiente_facturar,
              count(*) filter (where fecha_facturacion is null) as sgr_pendiente_facturar,
              coalesce(sum(devoluciones), 0)::int as devoluciones,
@@ -126,58 +143,70 @@ export async function resumen(f: Filtros) {
              coalesce(sum(horas_presu_total), 0)::float8 as horas_presu_total
       from v_requerimientos where ${filtro(f)}`,
     sql<(AggFase & { fase: Fase })[]>`select fase, ${aggFase()} from v_fases where ${filtro(f)} group by fase`,
-    sql<{ mes: number; sgr: number; acumulado: number; desestimados: number; facturado: number; horas_presu: number; horas_real: number }[]>`
-      with meses as (select generate_series(1, greatest(${hasta}::int,
-                       coalesce((select max(extract(month from implementacion))::int from v_requerimientos where ${filtro(f)}), 1))) as mes),
-           d as (select extract(month from implementacion)::int as mes,
-                        count(*) filter (where entregado) as sgr,
-                        count(*) filter (where desestimado) as desestimados,
-                        sum(total_facturar)::float8 as facturado,
-                        sum(horas_presu_total)::float8 as horas_presu, sum(horas_real_total)::float8 as horas_real
-                 from v_requerimientos where ${filtro(f)} group by 1)
-      select m.mes, coalesce(d.sgr, 0) as sgr,
-             sum(coalesce(d.sgr, 0)) over (order by m.mes)::int as acumulado,
-             coalesce(d.desestimados, 0) as desestimados,
-             coalesce(d.facturado, 0) as facturado, coalesce(d.horas_presu, 0) as horas_presu, coalesce(d.horas_real, 0) as horas_real
-      from meses m left join d on d.mes = m.mes order by m.mes`,
+    sql<{ clave: string; desarrollos: number; solo_test: number; facturado: number; horas_presu: number; horas_real: number }[]>`
+      select to_char(implementacion, 'YYYY-MM') as clave,
+             count(*) filter (where entregado and aplica_desa) as desarrollos,
+             count(*) filter (where entregado and servicio = 'solo_test') as solo_test,
+             coalesce(sum(total_facturar), 0)::float8 as facturado,
+             coalesce(sum(horas_presu_total), 0)::float8 as horas_presu,
+             coalesce(sum(horas_real_total), 0)::float8 as horas_real
+      from v_requerimientos where ${filtro(f)} and implementacion is not null group by 1`,
   ]);
+  const { meses, enCurso } = construirMeses(f.anios, porMes.map((r) => r.clave));
+  const datos = new Map(porMes.map((r) => [r.clave, r]));
+  let acumulado = 0, anioActual = 0;
+  const mensual: MesResumen[] = meses.map((m) => {
+    const d = datos.get(m.clave);
+    if (m.anio !== anioActual) { anioActual = m.anio; acumulado = 0; } // el acumulado es por año
+    acumulado += d?.desarrollos ?? 0;
+    return { ...m, desarrollos: d?.desarrollos ?? 0, solo_test: d?.solo_test ?? 0, acumulado_desa: acumulado,
+             facturado: d?.facturado ?? 0, horas_presu: d?.horas_presu ?? 0, horas_real: d?.horas_real ?? 0 };
+  });
   const porFase = (x: Fase) => fases.find((r) => r.fase === x) ?? { ...AGG_VACIO, fase: x };
-  return { kpis, desa: porFase("desa"), test: porFase("test"), mensual, mesEnCurso: hasta };
+  return { kpis, desa: porFase("desa"), test: porFase("test"), mensual, mesEnCurso: enCurso };
 }
 
 export type FilaResponsable = AggFase & { responsable: string; meses_activos: number };
+export type MesFase = Mes & { sgr: number; solo_test: number; horas_real: number; horas_presu: number };
 
 export async function fase(fz: Fase, f: Filtros) {
-  const hasta = ultimoMes(f.anio);
-  const [[total], responsables, mensual, puntos] = await Promise.all([
+  const [[total], responsables, porMes, puntos, [sinPresu]] = await Promise.all([
     sql<AggFase[]>`select ${aggFase()} from v_fases where fase = ${fz} and ${filtro(f)}`,
     sql<FilaResponsable[]>`
       select responsable, ${aggFase()},
              count(distinct date_trunc('month', fecha_fin)) as meses_activos
       from v_fases where fase = ${fz} and ${filtro(f)}
       group by responsable order by count(*) filter (where entregado) desc, count(*) desc, responsable`,
-    // Entregas de la fase por mes de FIN de la fase. Mes 0 = terminó antes del año (SGR de arrastre).
-    sql<{ mes: number; sgr: number; horas_real: number; horas_presu: number; dentro: number }[]>`
-      with meses as (select generate_series(0, ${hasta}::int) as mes),
-           d as (select case when fecha_fin < make_date(${f.anio}::int, 1, 1) then 0
-                             when fecha_fin > make_date(${f.anio}::int, 12, 31) then 12
-                             else extract(month from fecha_fin)::int end as mes,
-                        count(*) as sgr, sum(horas_real)::float8 as horas_real, sum(horas_presu)::float8 as horas_presu,
-                        count(*) filter (where horas_real > 0 and horas_real <= horas_presu) as dentro
-                 from v_fases where fase = ${fz} and ${filtro(f)} group by 1)
-      select m.mes, coalesce(d.sgr, 0) as sgr, coalesce(d.horas_real, 0) as horas_real,
-             coalesce(d.horas_presu, 0) as horas_presu, coalesce(d.dentro, 0) as dentro
-      from meses m left join d on d.mes = m.mes
-      where m.mes > 0 or d.sgr is not null order by m.mes`,
+    // Por mes de FIN de la fase.
+    sql<{ clave: string; sgr: number; solo_test: number; horas_real: number; horas_presu: number }[]>`
+      select to_char(fecha_fin, 'YYYY-MM') as clave, count(*) as sgr,
+             count(*) filter (where servicio = 'solo_test') as solo_test,
+             coalesce(sum(horas_real), 0)::float8 as horas_real, coalesce(sum(horas_presu), 0)::float8 as horas_presu
+      from v_fases where fase = ${fz} and ${filtro(f)} and fecha_fin is not null group by 1`,
     sql<{ id_req: string; responsable: string; horas_presu: number; horas_real: number; asunto: string | null }[]>`
       select id_req, responsable, horas_presu::float8, horas_real::float8, asunto
       from v_fases where fase = ${fz} and ${filtro(f)} and (horas_real > 0 or horas_presu > 0)`,
+    // Horas de desarrollo cargadas por equipos de Onnix SIN presupuesto: no cuentan como desarrollo.
+    sql<{ sgr: number; horas: number }[]>`
+      select count(*) as sgr, coalesce(sum(horas_desa), 0)::float8 as horas
+      from v_requerimientos where desa_sin_presu and ${filtro(f)}`,
   ]);
-  return { total: total ?? AGG_VACIO, responsables, mensual, puntos };
+  // Los que terminaron la fase antes del primer año elegido se agrupan en "Previo".
+  const { meses, inicio } = construirMeses(f.anios, porMes.map((r) => r.clave), true);
+  const cero = { sgr: 0, solo_test: 0, horas_real: 0, horas_presu: 0 };
+  const acum = new Map<string, typeof cero>();
+  for (const r of porMes) {
+    const k = claveDestino(r.clave, inicio, true);
+    const a = acum.get(k) ?? cero;
+    acum.set(k, { sgr: a.sgr + r.sgr, solo_test: a.solo_test + r.solo_test,
+                  horas_real: a.horas_real + r.horas_real, horas_presu: a.horas_presu + r.horas_presu });
+  }
+  const mensual: MesFase[] = meses.map((m) => ({ ...m, ...(acum.get(m.clave) ?? cero) }));
+  return { total: total ?? AGG_VACIO, responsables, mensual, puntos, sinPresu: sinPresu ?? { sgr: 0, horas: 0 } };
 }
 
 export async function tiempos(f: Filtros) {
-  const [fases, tramos, porDevolucion, masPausados, [calidad]] = await Promise.all([
+  const [fases, tramos, porDevolucion, masPausados, [calidad], porServicio] = await Promise.all([
     sql<(AggFase & { fase: Fase })[]>`select fase, ${aggFase()} from v_fases where ${filtro(f)} group by fase`,
     sql<{ tramo: number; sgr: number }[]>`
       select case when lead_neto <= 7 then 1 when lead_neto <= 15 then 2 when lead_neto <= 30 then 3
@@ -203,15 +232,22 @@ export async function tiempos(f: Filtros) {
              coalesce(sum(horas_pausadas) filter (where devoluciones > 0), 0)::float8 as horas_pausa_con_dev,
              coalesce(sum(horas_pausadas), 0)::float8 as horas_pausa_total
       from v_requerimientos where ${filtro(f)} and entregado`,
+    sql<{ servicio: string; sgr: number; lead_neto_med: number | null; lead_cal_med: number | null; pausa_prom: number }[]>`
+      select servicio, count(*) as sgr,
+             percentile_cont(0.5) within group (order by lead_neto)::float8 as lead_neto_med,
+             percentile_cont(0.5) within group (order by lead_cal)::float8 as lead_cal_med,
+             coalesce(avg(horas_pausadas), 0)::float8 as pausa_prom
+      from v_requerimientos where ${filtro(f)} and entregado group by servicio`,
   ]);
   const porFase = (x: Fase) => fases.find((r) => r.fase === x) ?? { ...AGG_VACIO, fase: x };
-  return { desa: porFase("desa"), test: porFase("test"), tramos, porDevolucion, masPausados, calidad };
+  porServicio.sort((a, b) => ORDEN_SERVICIOS.indexOf(a.servicio) - ORDEN_SERVICIOS.indexOf(b.servicio));
+  return { desa: porFase("desa"), test: porFase("test"), tramos, porDevolucion, masPausados, calidad, porServicio };
 }
 
-export type Dimension = "tipo_requerimiento" | "departamento" | "equipo" | "solicitante";
+export type Dimension = "servicio" | "tipo_requerimiento" | "departamento" | "equipo" | "solicitante";
 
 export type FilaDesglose = {
-  clave: string; sgr: number; entregados: number; desestimados: number; horas_presu: number; horas_real: number; presu_reg: number; real_reg: number;
+  clave: string; sgr: number; entregados: number; desestimados: number; desarrollos: number; solo_test: number; horas_presu: number; horas_real: number; presu_reg: number; real_reg: number;
   facturado: number; devoluciones: number; sgr_con_devolucion: number; lead_neto_med: number | null;
 };
 
@@ -221,6 +257,8 @@ export async function desglose(dim: Dimension, f: Filtros) {
     select coalesce(${col}, 'Sin dato') as clave, count(*) as sgr,
            count(*) filter (where entregado) as entregados,
            count(*) filter (where desestimado) as desestimados,
+           count(*) filter (where entregado and aplica_desa) as desarrollos,
+           count(*) filter (where entregado and servicio = 'solo_test') as solo_test,
            coalesce(sum(horas_presu_total), 0)::float8 as horas_presu,
            coalesce(sum(horas_real_total), 0)::float8 as horas_real,
            coalesce(sum(horas_presu_total) filter (where horas_real_total > 0), 0)::float8 as presu_reg,
@@ -234,11 +272,12 @@ export async function desglose(dim: Dimension, f: Filtros) {
 }
 
 export async function facturacion(f: Filtros) {
-  return sql<{ periodo: string | null; sgr: number; desestimados: number; total_desestimados: number; importe_desa: number; importe_test: number; total: number;
+  return sql<{ periodo: string | null; sgr: number; desestimados: number; total_desestimados: number; importe_test_cliente: number; importe_desa: number; importe_test: number; total: number;
                horas_presu: number; horas_real: number; presu_reg: number; real_reg: number }[]>`
     select to_char(fecha_facturacion, 'YYYY-MM-DD') as periodo, count(*) as sgr,
            count(*) filter (where desestimado) as desestimados,
            coalesce(sum(total_facturar) filter (where desestimado), 0)::float8 as total_desestimados,
+           coalesce(sum(importe_test) filter (where servicio = 'solo_test'), 0)::float8 as importe_test_cliente,
            coalesce(sum(case when aplica_desa then importe_desa else 0 end), 0)::float8 as importe_desa,
            coalesce(sum(case when aplica_test then importe_test else 0 end), 0)::float8 as importe_test,
            coalesce(sum(total_facturar), 0)::float8 as total,
@@ -252,7 +291,7 @@ export async function facturacion(f: Filtros) {
 
 export type FilaDetalle = {
   id_req: string; asunto: string | null; departamento: string | null; tipo_requerimiento: string | null;
-  equipo: string | null; estado: string | null; desestimado: boolean; equipo_externo: boolean; aplica_desa: boolean; aplica_test: boolean;
+  equipo: string | null; estado: string | null; desestimado: boolean; servicio: string; desa_sin_presu: boolean; equipo_externo: boolean; aplica_desa: boolean; aplica_test: boolean;
   asignado_a: string | null; asignado_testing: string | null;
   horas_desa: number; horas_presu_desa: number; horas_test: number; horas_presu_test: number;
   devoluciones: number; horas_pausadas: number; horas_pausadas_desa: number; horas_pausadas_test: number;
@@ -263,7 +302,7 @@ export type FilaDetalle = {
 
 export async function detalle(f: Filtros) {
   return sql<FilaDetalle[]>`
-    select id_req, asunto, departamento, tipo_requerimiento, equipo, estado, desestimado, equipo_externo, aplica_desa, aplica_test,
+    select id_req, asunto, departamento, tipo_requerimiento, equipo, estado, desestimado, servicio, desa_sin_presu, equipo_externo, aplica_desa, aplica_test,
            asignado_a, asignado_testing, horas_desa, horas_presu_desa, horas_test, horas_presu_test,
            devoluciones, horas_pausadas, horas_pausadas_desa, horas_pausadas_test,
            fecha_inicio_desa, fecha_fin_desa, fecha_inicio_testing, fecha_fin_testing,

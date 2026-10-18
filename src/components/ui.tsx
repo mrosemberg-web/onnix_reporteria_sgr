@@ -1,19 +1,31 @@
 import Link from "next/link";
 import { FiltrosBar } from "./FiltrosBar";
-import { num } from "@/lib/formato";
-import type { Filtros } from "@/lib/filtros";
+import { fechaHora, num } from "@/lib/formato";
+import { nombreEstado } from "@/lib/estados";
+import { nombreServicio } from "@/lib/servicios";
+import { BotonPdf } from "./BotonPdf";
+import { describirFiltros, type Filtros } from "@/lib/filtros";
 import type { opciones } from "@/lib/reportes";
 
 export function Encabezado({ titulo, bajada, op, f }: {
   titulo: string; bajada?: React.ReactNode; op: Awaited<ReturnType<typeof opciones>>; f: Filtros;
 }) {
+  const generado = fechaHora(new Date());
   return (
     <header className="encabezado">
-      <div>
-        <h1>{titulo}</h1>
+      <div className="encabezado-texto">
+        <p className="solo-impresion impresion-marca">Productividad del servicio de desarrollo y testing</p>
+        <div className="encabezado-titulo">
+          <h1>{titulo}</h1>
+          <BotonPdf nombreArchivo={`${titulo} - Productividad`} />
+        </div>
         {bajada && <p>{bajada}</p>}
+        <p className="solo-impresion impresion-meta">
+          {describirFiltros(f, { estado: nombreEstado, servicio: nombreServicio })} Generado el {generado}
+          {op.ultimaCarga && <> con datos de «{op.ultimaCarga.archivo}» ({fechaHora(op.ultimaCarga.cargado_en)})</>}.
+        </p>
       </div>
-      <FiltrosBar anios={op.anios} equipos={op.equipos} tipos={op.tipos} estados={op.estados} valores={f} />
+      <FiltrosBar anios={op.anios} equipos={op.equipos} tipos={op.tipos} estados={op.estados} servicios={op.servicios} valores={f} />
     </header>
   );
 }

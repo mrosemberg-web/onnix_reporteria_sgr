@@ -82,6 +82,7 @@ Están en las vistas `v_requerimientos` y `v_fases` del archivo de migración, p
 - **Fases independientes.** Desarrollo y testing se miden por separado, cada uno con su fecha de inicio y fin, porque no son secuenciales.
 - **Pausas.** Las horas pausadas se consideran tiempo calendario detenido: *días netos = días calendario − horas pausadas ÷ 24* (los días calendario se cuentan inclusive).
 - **Tiempo de entrega.** Va desde el inicio de la primera fase que aplique hasta la fecha de implementación, descontando las «Horas Pausadas» totales del SGR.
+- **Desarrollo y Testing como servicios.** Un SGR es un **desarrollo de Onnix** solo si tiene horas presupuestadas de desarrollo, en cualquier equipo. Sin presupuesto de desarrollo nunca cuenta como desarrollo entregado, aunque tenga horas o importe cargados; esas horas se informan aparte como «horas de desarrollo sin presupuesto». **Testing** es un servicio adicional que se presta sobre desarrollos de Onnix y sobre desarrollos internos del cliente. Cada SGR tiene un servicio: *Desarrollo con testing*, *Desarrollo sin testing*, *Solo testing (desarrollo del cliente)* o *Sin horas presupuestadas*.
 - **Estados.** PRO es *Finalizado en producción*, PAP es *Pase a producción* (terminado, todavía no pasado a PRO) y DST es *Desestimado por el cliente*.
   - Un SGR cuenta como **entregado** si está en PRO o PAP.
   - Los desestimados conservan sus horas y su facturación, porque el trabajo se hizo, pero no cuentan como entregas ni para el tiempo de entrega. Se informan aparte.
@@ -107,7 +108,9 @@ Están en las vistas `v_requerimientos` y `v_fases` del archivo de migración, p
 - **Facturación:** importes por período, SGR sin fecha de facturación y horas no facturadas.
 - **Requerimientos:** detalle buscable y ordenable, con exportación a CSV.
 
-Todos se filtran por año, equipo (incluidos los grupos «Equipos de Onnix» y «Solo testing»), tipo y estado, y se pueden imprimir a PDF desde el navegador.
+Todos se filtran por año, servicio, equipo (incluidos los grupos «Equipos de Onnix» y «Equipos DITA y DPJ»), tipo y estado. Cada filtro admite **varios valores**: dentro de un filtro se combinan con «o» y entre filtros con «y». Con varios años, los gráficos mensuales muestran cada mes de cada año y el acumulado se reinicia al empezar cada año.
+
+Cada reporte tiene un botón **Exportar PDF**: abre el diálogo de impresión del navegador, donde se elige «Guardar como PDF». El PDF sale en A4 apaisado, en colores claros, con el título, los filtros aplicados, la fecha de generación y el archivo de datos usado; el nombre del archivo es el título del reporte.
 
 ## Estructura
 

@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import type { FilaDetalle } from "@/lib/reportes";
 import { claseEstado, nombreEstado } from "@/lib/estados";
+import { claseServicio, SERVICIOS } from "@/lib/servicios";
 
 const nf = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const n = (v: number | null) => (v === null ? "â€“" : nf.format(v));
@@ -9,7 +10,7 @@ const f = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "â
 
 type Col = { k: keyof FilaDetalle; t: string; num?: boolean; fecha?: boolean };
 const COLS: Col[] = [
-  { k: "id_req", t: "SGR" }, { k: "asunto", t: "Asunto" }, { k: "estado", t: "Estado" }, { k: "tipo_requerimiento", t: "Tipo" },
+  { k: "id_req", t: "SGR" }, { k: "asunto", t: "Asunto" }, { k: "estado", t: "Estado" }, { k: "servicio", t: "Servicio" }, { k: "tipo_requerimiento", t: "Tipo" },
   { k: "asignado_a", t: "Desarrollo" }, { k: "horas_desa", t: "H. desa", num: true }, { k: "horas_presu_desa", t: "Presu. desa", num: true },
   { k: "asignado_testing", t: "Testing" }, { k: "horas_test", t: "H. test", num: true }, { k: "horas_presu_test", t: "Presu. test", num: true },
   { k: "devoluciones", t: "Dev. al cliente", num: true }, { k: "horas_pausadas", t: "Pausa (h)", num: true },
@@ -85,6 +86,7 @@ export function TablaRequerimientos({ filas }: { filas: FilaDetalle[] }) {
                 <td>{r.id_req}</td>
                 <td className="recorte" title={r.asunto ?? ""}>{r.asunto}</td>
                 <td><span className={`etiqueta ${claseEstado(r.estado)}`} title={r.estado ?? ""}>{nombreEstado(r.estado)}</span></td>
+                <td><span className={`etiqueta ${claseServicio(r.servicio)}`} title={SERVICIOS[r.servicio]?.nombre}>{SERVICIOS[r.servicio]?.corto ?? r.servicio}</span></td>
                 <td className="recorte" style={{ maxWidth: 160 }} title={r.tipo_requerimiento ?? ""}>{r.tipo_requerimiento}</td>
                 {r.aplica_desa ? (
                   <>
@@ -93,8 +95,10 @@ export function TablaRequerimientos({ filas }: { filas: FilaDetalle[] }) {
                     <td className="n">{n(r.horas_presu_desa)}</td>
                   </>
                 ) : (
-                  <td colSpan={3} className="debil" title={r.equipo_externo ? "Desarrollo a cargo del cliente (DITA/DPJ)" : "Sin fase de desarrollo"}>
-                    {r.equipo_externo ? "Desarrollo del cliente" : "Sin desarrollo"}
+                  <td colSpan={3} className="debil"
+                    title={r.desa_sin_presu ? `${n(r.horas_desa)} h de desarrollo cargadas sin presupuesto: no cuentan como desarrollo` : "Sin presupuesto de desarrollo de Onnix"}>
+                    {r.aplica_test ? "Desarrollo del cliente" : "Sin desarrollo"}
+                    {r.desa_sin_presu && <> ({n(r.horas_desa)} h sin presupuesto)</>}
                   </td>
                 )}
                 {r.aplica_test ? (

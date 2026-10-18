@@ -1,7 +1,7 @@
 import { TablaRequerimientos } from "@/components/TablaRequerimientos";
 import { Encabezado, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
-import { aQuery, type SearchParams } from "@/lib/filtros";
+import { aQuery, textoAnios, type SearchParams } from "@/lib/filtros";
 import { detalle } from "@/lib/reportes";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const filas = await detalle(f);
   return (
     <>
-      <Encabezado titulo={`Requerimientos ${f.anio}`} op={op} f={f}
+      <Encabezado titulo={`Requerimientos ${textoAnios(f)}`} op={op} f={f}
         bajada="Detalle por SGR con las reglas aplicadas. El color de las horas indica si la fase quedó dentro del presupuesto." />
       <section className="panel">
         <div className="panel-cab" style={{ marginBottom: 12 }}>

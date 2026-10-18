@@ -13,28 +13,50 @@ function maxRedondo(v: number, div = 4) {
 const marcas = (max: number, n = 4) => Array.from({ length: n + 1 }, (_, i) => (max / n) * i);
 
 // ---------------------------------------------------------------------------
-// Barras mensuales + línea de acumulado
+// Barras mensuales (apilables) + línea de acumulado
 // ---------------------------------------------------------------------------
+export type DatoMensual = {
+  etiqueta: string;
+  /** Un valor por serie, de abajo hacia arriba. */
+  segmentos: number[];
+  acumulado: number;
+  /** Cambia el grupo (p. ej. el año): la línea de acumulado se corta y vuelve a empezar. */
+  grupo?: number;
+};
+
 export function BarrasAcumulado({
-  datos, color = "var(--desa)", resaltarUltimo = false, unidad = "SGR",
+  datos, series, nombreLinea = "Acumulado del año (eje derecho)", resaltarUltimo = false, unidad = "SGR",
 }: {
-  datos: { etiqueta: string; valor: number; acumulado: number }[];
-  color?: string; resaltarUltimo?: boolean; unidad?: string;
+  datos: DatoMensual[];
+  series: { nombre: string; color: string; colorTexto?: string }[];
+  nombreLinea?: string;
+  resaltarUltimo?: boolean;
+  unidad?: string;
 }) {
   const W = 720, H = 290, L = 34, R = 46, T = 26, B = 30;
   const ancho = W - L - R, alto = H - T - B;
-  const maxV = maxRedondo(Math.max(1, ...datos.map((d) => d.valor)) * 1.1);
+  const total = (d: DatoMensual) => d.segmentos.reduce((a, b) => a + b, 0);
+  const maxV = maxRedondo(Math.max(1, ...datos.map(total)) * 1.1);
   const maxA = maxRedondo(Math.max(1, ...datos.map((d) => d.acumulado)));
   const banda = ancho / Math.max(datos.length, 1);
   const xb = (i: number) => L + i * banda + banda / 2;
   const yv = (v: number) => T + alto - (v / maxV) * alto;
   const ya = (v: number) => T + alto - (v / maxA) * alto;
-  const linea = datos.map((d, i) => `${i ? "L" : "M"}${xb(i).toFixed(1)},${ya(d.acumulado).toFixed(1)}`).join(" ");
   const ult = datos.length - 1;
+  const etiquetaCada = datos.length > 18 ? 3 : datos.length > 12 ? 2 : 1;
+
+  // Un tramo de línea por grupo (año).
+  const tramos: string[] = [];
+  datos.forEach((d, i) => {
+    const nuevo = i === 0 || d.grupo !== datos[i - 1].grupo;
+    const p = `${xb(i).toFixed(1)},${ya(d.acumulado).toFixed(1)}`;
+    if (nuevo) tramos.push(`M${p}`); else tramos[tramos.length - 1] += ` L${p}`;
+  });
+
   return (
     <figure style={{ margin: 0 }}>
       <svg className="grafico" viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label={`Entregas por mes y acumulado. Total acumulado: ${datos[ult]?.acumulado ?? 0} ${unidad}.`}>
+        aria-label={`Entregas por mes. Acumulado al último mes: ${datos[ult]?.acumulado ?? 0} ${unidad}.`}>
         {marcas(maxV).map((m) => (
           <g key={m}>
             <line className="eje" x1={L} x2={W - R} y1={yv(m)} y2={yv(m)} strokeDasharray={m ? "2 4" : undefined} />
@@ -45,22 +67,34 @@ export function BarrasAcumulado({
           <text key={m} x={W - R + 8} y={ya(m) + 4} style={{ fill: "var(--tinta-3)" }}>{num(m)}</text>
         ))}
         {datos.map((d, i) => {
-          const bw = Math.min(banda * 0.58, 40);
+          const bw = Math.min(banda * 0.62, 40);
           const tenue = resaltarUltimo && i === ult;
+          let base = 0;
           return (
-            <g key={i}>
-              <rect x={xb(i) - bw / 2} y={yv(d.valor)} width={bw} height={Math.max(0, T + alto - yv(d.valor))} rx={3}
-                fill={color} opacity={tenue ? 0.45 : 0.9}>
-                <title>{`${d.etiqueta}: ${d.valor} ${unidad} (acumulado ${d.acumulado})`}</title>
-              </rect>
-              {d.valor > 0 && (T + alto - yv(d.valor) > 22
-                ? <text x={xb(i)} y={yv(d.valor) + 15} textAnchor="middle" style={{ fill: "var(--superficie)", fontWeight: 650 }}>{d.valor}</text>
-                : <text x={xb(i)} y={yv(d.valor) - 6} textAnchor="middle" style={{ fill: "var(--tinta)", fontWeight: 600 }}>{d.valor}</text>)}
-              <text x={xb(i)} y={H - 10} textAnchor="middle">{d.etiqueta}</text>
+            <g key={i} opacity={tenue ? 0.5 : 1}>
+              <title>{`${d.etiqueta}: ${d.segmentos.map((v, k) => `${series[k]?.nombre ?? ""} ${v}`).join(", ")}. Acumulado ${d.acumulado}`}</title>
+              {d.segmentos.map((v, k) => {
+                const y0 = yv(base), y1 = yv(base + v);
+                base += v;
+                const h = Math.max(0, y0 - y1);
+                return (
+                  <g key={k}>
+                    <rect x={xb(i) - bw / 2} y={y1} width={bw} height={h} fill={series[k]?.color ?? "var(--desa)"}
+                      rx={k === d.segmentos.length - 1 ? 3 : 0} />
+                    {v > 0 && h > 18 && (
+                      <text x={xb(i)} y={y1 + 14} textAnchor="middle" style={{ fill: series[k]?.colorTexto ?? "var(--superficie)", fontWeight: 650 }}>{v}</text>
+                    )}
+                  </g>
+                );
+              })}
+              {total(d) > 0 && d.segmentos.some((v) => v > 0 && yv(0) - yv(v) <= 18) && (
+                <text x={xb(i)} y={yv(total(d)) - 6} textAnchor="middle" style={{ fill: "var(--tinta)", fontWeight: 600 }}>{total(d)}</text>
+              )}
+              {i % etiquetaCada === 0 && <text x={xb(i)} y={H - 10} textAnchor="middle">{d.etiqueta}</text>}
             </g>
           );
         })}
-        <path d={linea} fill="none" stroke="var(--tinta)" strokeWidth={2} />
+        {tramos.map((t, k) => <path key={k} d={t} fill="none" stroke="var(--tinta)" strokeWidth={2} />)}
         {datos.map((d, i) => (
           <circle key={i} cx={xb(i)} cy={ya(d.acumulado)} r={3.5} fill="var(--superficie)" stroke="var(--tinta)" strokeWidth={2}>
             <title>{`Acumulado a ${d.etiqueta}: ${d.acumulado}`}</title>
@@ -68,8 +102,8 @@ export function BarrasAcumulado({
         ))}
       </svg>
       <div className="leyenda">
-        <span><i style={{ background: color }} />{unidad} entregados en el mes</span>
-        <span><i style={{ background: "var(--tinta)", height: 2, verticalAlign: 3 }} />Acumulado del año (eje derecho)</span>
+        {series.map((s) => <span key={s.nombre}><i style={{ background: s.color }} />{s.nombre}</span>)}
+        <span><i style={{ background: "var(--tinta)", height: 2, verticalAlign: 3 }} />{nombreLinea}</span>
         {resaltarUltimo && <span>El último mes está en curso.</span>}
       </div>
     </figure>
@@ -107,7 +141,7 @@ export function BarrasPresuReal({
                 fill="none" stroke="var(--tinta-2)" strokeDasharray="3 2" />
               <rect x={x(i) - br / 2} y={y(d.real)} width={br} height={T + alto - y(d.real)} rx={2}
                 fill={exceso ? "var(--mal)" : color} opacity={0.9} />
-              <text x={x(i)} y={H - 10} textAnchor="middle">{d.etiqueta}</text>
+              {i % (datos.length > 18 ? 3 : datos.length > 12 ? 2 : 1) === 0 && <text x={x(i)} y={H - 10} textAnchor="middle">{d.etiqueta}</text>}
             </g>
           );
         })}

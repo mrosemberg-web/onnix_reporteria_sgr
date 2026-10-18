@@ -222,10 +222,78 @@ tfoot td { font-weight: 650; border-bottom: 0; border-top: 2px solid var(--linea
 .zona-archivo.activa { border-color: var(--desa); background: var(--desa-suave); }
 .lista-adv { max-height: 220px; overflow: auto; font-size: 0.85rem; color: var(--tinta-2); margin: 8px 0 0; padding-left: 18px; }
 
-/* Impresión: los reportes se pueden imprimir a PDF desde el navegador. */
+/* Selector múltiple de filtros --------------------------------------- */
+.selector { position: relative; }
+.selector-boton {
+  font: inherit; font-size: 0.92rem; color: var(--tinta); text-align: left; cursor: pointer;
+  background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r-chico);
+  padding: 7px 10px; min-height: 36px; min-width: 150px; max-width: 260px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.selector-boton.activo { border-color: var(--desa); background: var(--desa-suave); }
+.selector-valor { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selector-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; width: max(260px, 100%); max-width: min(360px, 90vw);
+  background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.14); padding: 8px; display: grid; gap: 6px; color: var(--tinta);
+}
+.selector-busqueda { width: 100%; }
+.selector-atajos { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; padding: 0 4px; }
+.selector-atajos button { all: unset; cursor: pointer; color: var(--desa); font-weight: 600; }
+.selector-atajos button:focus-visible { outline: 2px solid var(--foco); }
+.selector-lista { max-height: 280px; overflow-y: auto; }
+.selector-grupo { font-size: 0.75rem; color: var(--tinta-3); padding: 8px 8px 2px; }
+.selector-opcion { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: var(--r-chico); cursor: pointer; font-size: 0.88rem; color: var(--tinta); }
+.selector-opcion:hover { background: var(--superficie-2); }
+.selector-opcion input { margin-top: 3px; }
+.selector-pie { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--linea); padding-top: 8px; }
+.selector-pie .boton { min-height: 32px; padding: 6px 12px; font-size: 0.85rem; }
+.filtros .selector:nth-last-child(-n+2) .selector-panel { left: auto; right: 0; }
+.heroe-servicio { display: grid; gap: 6px; padding-top: 14px; border-top: 3px solid var(--test); }
+.heroe-servicio p { font-size: 0.92rem; }
+.heroe-servicio strong { color: var(--test); }
+
+/* Encabezado de reporte ---------------------------------------------- */
+.encabezado-titulo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.encabezado-titulo .boton { min-height: 32px; padding: 6px 12px; font-size: 0.85rem; }
+.solo-impresion { display: none; }
+
+/* Exportación a PDF (impresión) ----------------------------------------
+   Cada reporte se exporta con el botón «Exportar PDF» (diálogo de impresión
+   del navegador > Guardar como PDF). A4 apaisado, siempre en colores claros. */
+@page { size: A4 landscape; margin: 12mm 12mm 14mm; }
 @media print {
-  .lateral, .filtros, .no-imprimir { display: none !important; }
+  :root {
+    color-scheme: light;
+    --fondo: #ffffff; --superficie: #ffffff; --superficie-2: #f3f5f8; --tinta: #172033; --tinta-2: #4e596c;
+    --tinta-3: #7b8597; --linea: #d5dbe4; --desa: #2f4bb0; --desa-suave: #dce3f7; --test: #b5651d; --test-suave: #f5e4d2;
+    --bien: #247a4d; --bien-suave: #d9efe2; --leve: #a77a0e; --leve-suave: #f6ecd0; --mal: #b03a3a; --mal-suave: #f6dcdc;
+    --sombra: none;
+  }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { background: #fff; font-size: 11px; }
+  .lateral, .filtros, .no-imprimir, .selector-panel, .acciones-fila { display: none !important; }
+  .solo-impresion { display: block; }
   .marco { display: block; }
-  body { background: #fff; }
-  .panel, .banda { box-shadow: none; break-inside: avoid; }
+  .contenido { padding: 0; gap: 12px; }
+  .encabezado { display: block; }
+  .encabezado p { max-width: none; }
+  .impresion-marca { color: var(--tinta-3); font-size: 0.85rem; margin-bottom: 4px; }
+  .impresion-meta { color: var(--tinta-2); font-size: 0.85rem; margin-top: 6px; }
+  h1 { font-size: 1.5rem; }
+  .panel, .banda, .lectura, .aviso { box-shadow: none; break-inside: avoid; }
+  /* Las tablas y la lectura pueden continuar en la página siguiente. */
+  .panel:has(table), .lectura { break-inside: auto; }
+  .panel .grafico:not([style]) { max-height: 82mm; }
+  .panel { padding: 12px 14px; }
+  .heroe { grid-template-columns: 200px minmax(0, 1fr); }
+  .heroe-cifra .grande { font-size: 3.6rem; }
+  .rejilla-2, .fases { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .tabla-env { overflow: visible; margin: 0; padding: 0; }
+  table { font-size: 0.82rem; }
+  th, td { padding: 4px 6px; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  .recorte { max-width: 220px; }
+  a { color: inherit; text-decoration: none; }
 }

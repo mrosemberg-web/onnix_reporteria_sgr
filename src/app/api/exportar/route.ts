@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { obtenerSesion } from "@/lib/auth";
-import { leerFiltros } from "@/lib/filtros";
+import { desdeUrl, leerFiltros, textoAnios } from "@/lib/filtros";
 import { detalle, opciones } from "@/lib/reportes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const COLUMNAS = [
-  "id_req", "asunto", "departamento", "tipo_requerimiento", "equipo", "estado", "aplica_desa", "aplica_test",
+  "id_req", "asunto", "departamento", "tipo_requerimiento", "equipo", "estado", "servicio", "aplica_desa", "aplica_test",
   "asignado_a", "horas_desa", "horas_presu_desa", "horas_pausadas_desa", "asignado_testing", "horas_test",
   "horas_presu_test", "horas_pausadas_test", "devoluciones", "horas_pausadas", "fecha_inicio_desa", "fecha_fin_desa",
   "fecha_inicio_testing", "fecha_fin_testing", "implementacion", "fecha_facturacion", "total_facturar", "lead_cal", "lead_neto",
@@ -24,13 +24,13 @@ function celda(v: unknown) {
 export async function GET(req: NextRequest) {
   if (!(await obtenerSesion())) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const op = await opciones();
-  const f = leerFiltros(Object.fromEntries(req.nextUrl.searchParams), op.anios);
+  const f = leerFiltros(desdeUrl(req.nextUrl.searchParams), op.anios);
   const filas = await detalle(f);
   const lineas = [COLUMNAS.join(";"), ...filas.map((r) => COLUMNAS.map((c) => celda(r[c])).join(";"))];
   return new NextResponse("\uFEFF" + lineas.join("\r\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="requerimientos_${f.anio}.csv"`,
+      "Content-Disposition": `attachment; filename="requerimientos_${textoAnios(f).replace(/\D+/g, "-")}.csv"`,
       "Cache-Control": "no-store",
     },
   });

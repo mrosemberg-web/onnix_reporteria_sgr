@@ -12,7 +12,8 @@ export function lecturaFase(fz: Fase, t: AggFase, resp: FilaResponsable[]): stri
 
   if (idx !== null) {
     const desest = t.desestimados ? ` (${num(t.desestimados)} de ellos luego desestimados por el cliente)` : "";
-    const base = `Se cerraron ${num(t.sgr)} SGR de ${NOMBRE[fz]}${desest}. En los ${num(conHoras)} con horas cargadas se trabajaron ${horas(t.real_reg)} contra ${horas(t.presu_reg)} presupuestadas (índice de cumplimiento ${num(idx, 2)}).`;
+    const cliente = fz === "test" && t.solo_test ? `, ${num(t.solo_test)} de ellos sobre desarrollos internos del cliente` : "";
+    const base = `Se cerraron ${num(t.sgr)} SGR de ${NOMBRE[fz]}${cliente}${desest}. En los ${num(conHoras)} con horas cargadas se trabajaron ${horas(t.real_reg)} contra ${horas(t.presu_reg)} presupuestadas (índice de cumplimiento ${num(idx, 2)}).`;
     if (idx >= 1) {
       out.push(`${base} El equipo usó ${pct(1 - t.real_reg / t.presu_reg)} menos horas de las presupuestadas.`);
     } else {
@@ -56,17 +57,22 @@ export function lecturaFase(fz: Fase, t: AggFase, resp: FilaResponsable[]): stri
   return out;
 }
 
-/** Lectura del resumen: entregas, desestimados, presupuesto por fase y devoluciones al cliente. */
+/** Lectura del resumen: desarrollos, testing como servicio adicional, presupuesto y devoluciones al cliente. */
 export function lecturaResumen(k: KpisReq, desa: AggFase, test: AggFase): string[] {
   const out: string[] = [];
-  const pap = k.sgr_pap ? `, ${num(k.sgr_pap)} de ellos en pase a producción` : "";
-  out.push(`Se entregaron ${num(k.entregados)} SGR${pap}.`);
+  out.push(
+    `Se entregaron ${num(k.desarrollos_entregados)} desarrollos. Además, Testing se prestó como servicio adicional en ${num(k.testing_entregados)} SGR entregados: ${num(k.testing_onnix)} sobre desarrollos de Onnix y ${num(k.testing_cliente)} sobre desarrollos internos del cliente${k.facturado_test_cliente ? ` (${gsCorto(k.facturado_test_cliente)} facturables)` : ""}.`
+  );
+  if (k.sgr_pap) out.push(`${num(k.sgr_pap)} SGR están en pase a producción, todavía sin pasar al estado final.`);
   if (k.desestimados) {
-    out.push(`Otros ${num(k.desestimados)} SGR fueron desestimados por el cliente después de iniciados: consumieron ${horas(k.horas_desestimados)} de trabajo y ${gsCorto(k.facturado_desestimados)} facturables, aunque no llegaron a producción.`);
+    out.push(`${num(k.desestimados)} SGR fueron desestimados por el cliente después de iniciados: consumieron ${horas(k.horas_desestimados)} de trabajo y ${gsCorto(k.facturado_desestimados)} facturables, aunque no llegaron a producción.`);
   }
   out.push(...lecturaFase("desa", desa, []).slice(0, 1), ...lecturaFase("test", test, []).slice(0, 1));
   if (k.sgr_con_devolucion) {
     out.push(`${num(k.sgr_con_devolucion)} SGR (${pct(k.sgr_con_devolucion / k.sgr)}) se devolvieron al cliente por falta de datos o consultas. El tiempo de entrega se informa descontando las pausas, para separar la espera del cliente del trabajo del equipo.`);
+  }
+  if (k.desa_sin_presu) {
+    out.push(`${num(k.desa_sin_presu)} SGR tienen ${horas(k.horas_desa_sin_presu)} de desarrollo cargadas sin presupuesto de desarrollo; no se cuentan como desarrollos ni suman horas.`);
   }
   return out;
 }

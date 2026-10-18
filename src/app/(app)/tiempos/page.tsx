@@ -1,7 +1,8 @@
 import { BarrasH } from "@/components/graficos";
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
-import type { SearchParams } from "@/lib/filtros";
+import { textoAnios, type SearchParams } from "@/lib/filtros";
+import { claseServicio, nombreServicio } from "@/lib/servicios";
 import { dias, horas, num, pct } from "@/lib/formato";
 import { indice, pctPausa, tiempos } from "@/lib/reportes";
 
@@ -14,7 +15,7 @@ const GRUPOS = ["Sin devoluciones al cliente", "1 devolución", "2 devoluciones"
 export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { sesion, op, f, vacio } = await contextoReporte(searchParams);
   if (vacio) return <SinDatos esAdmin={sesion.rol === "admin"} />;
-  const { desa, test, tramos, porDevolucion, masPausados, calidad } = await tiempos(f);
+  const { desa, test, tramos, porDevolucion, masPausados, calidad, porServicio } = await tiempos(f);
 
   const sinDev = porDevolucion.find((g) => g.grupo === 0);
   const conDev = porDevolucion.filter((g) => g.grupo > 0);
@@ -38,7 +39,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
   return (
     <>
-      <Encabezado titulo={`Tiempos y devoluciones ${f.anio}`} op={op} f={f}
+      <Encabezado titulo={`Tiempos y devoluciones ${textoAnios(f)}`} op={op} f={f}
         bajada="Duración de cada fase y del ciclo completo, separando el tiempo calendario del tiempo en pausa. Las pausas incluyen la espera cuando un SGR se devuelve al cliente por falta de datos o consultas." />
 
       <section className="banda">
@@ -81,6 +82,32 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <BarrasH datos={tramos.map((t) => ({ etiqueta: TRAMOS[t.tramo - 1], valor: t.sgr }))} />
         </section>
       </div>
+
+      <section className="panel">
+        <div className="panel-cab">
+          <h2>Tiempo de entrega por servicio</h2>
+          <p>Desde el inicio de la primera fase hasta la implementación. En «Solo testing» mide únicamente el servicio de testing.</p>
+        </div>
+        <div className="tabla-env">
+          <table>
+            <thead>
+              <tr><th>Servicio</th><th className="n">SGR entregados</th><th className="n">Entrega, mediana sin pausas</th>
+                <th className="n">Entrega, mediana calendario</th><th className="n">Pausa promedio por SGR</th></tr>
+            </thead>
+            <tbody>
+              {porServicio.map((r) => (
+                <tr key={r.servicio}>
+                  <td><span className={`etiqueta ${claseServicio(r.servicio)}`}>{nombreServicio(r.servicio)}</span></td>
+                  <td className="n">{num(r.sgr)}</td>
+                  <td className="n">{dias(r.lead_neto_med)}</td>
+                  <td className="n">{dias(r.lead_cal_med)}</td>
+                  <td className="n">{horas(r.pausa_prom)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="panel">
         <div className="panel-cab">

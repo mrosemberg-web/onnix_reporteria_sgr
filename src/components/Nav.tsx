@@ -23,9 +23,8 @@ export function Nav({ esAdmin }: { esAdmin: boolean }) {
   const sp = useSearchParams();
   // Conserva año y filtros al moverse entre reportes.
   const q = new URLSearchParams();
-  for (const k of ["anio", "equipo", "tipo", "estado"]) {
-    const v = sp.get(k);
-    if (v) q.set(k, v);
+  for (const k of ["anio", "equipo", "tipo", "estado", "servicio"]) {
+    for (const v of sp.getAll(k)) q.append(k, v);
   }
   const qs = q.toString();
   const enlace = (i: Item) => (
