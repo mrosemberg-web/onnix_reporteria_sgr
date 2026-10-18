@@ -4,6 +4,7 @@ import { leerFiltros } from "@/lib/filtros";
 import { detalle, opciones } from "@/lib/reportes";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const COLUMNAS = [
   "id_req", "asunto", "departamento", "tipo_requerimiento", "equipo", "estado", "aplica_desa", "aplica_test",

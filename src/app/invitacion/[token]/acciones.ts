@@ -2,7 +2,7 @@
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { hashToken, iniciarSesion, REGLA_USUARIO, validarClave } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { asegurarConexion, sql } from "@/lib/db";
 
 export type EstadoInvitacion = { error?: string; nombre?: string; usuario?: string; intento?: number };
 
@@ -20,6 +20,7 @@ export async function aceptarInvitacion(prev: EstadoInvitacion, fd: FormData): P
   if (errClave) return fallo(errClave);
   if (clave !== confirmar) return fallo("Las claves no coinciden.");
 
+  await asegurarConexion();
   const hash = await bcrypt.hash(clave, 12);
   const resultado = await sql.begin(async (tx) => {
     const [inv] = await tx<{ id: number; rol: "admin" | "lector" }[]>`

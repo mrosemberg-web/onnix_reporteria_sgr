@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { asegurarConexion, sql } from "@/lib/db";
 import { describirError } from "@/lib/diagnostico";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 /**
  * Diagnóstico de configuración, accesible sin sesión: abrí /api/salud en el navegador.
@@ -29,6 +30,7 @@ export async function GET() {
   let base: Record<string, unknown>;
   const t0 = Date.now();
   try {
+    await asegurarConexion();
     const [r] = await sql<{ usuarios: number; admins: number; requerimientos: number }[]>`
       select (select count(*) from usuarios) as usuarios,
              (select count(*) from usuarios where rol = 'admin' and activo) as admins,
@@ -42,7 +44,10 @@ export async function GET() {
     base = { conecta: false, ms: Date.now() - t0, codigo: d.codigo, motivo: d.mensaje };
   }
 
-  const ok = authSecret && base.conecta === true && Number(base.admins ?? 0) > 0;
+  if (base.conecta === true && base.migracion_estados === false) {
+    base.motivo = "Falta aplicar la migración 20261018000000_estados.sql: los reportes fallan hasta ejecutarla.";
+  }
+  const ok = authSecret && base.conecta === true && Number(base.admins ?? 0) > 0 && base.migracion_estados === true;
   return NextResponse.json(
     { ok, auth_secret_valido: authSecret, database_url: destino, base, region: process.env.VERCEL_REGION ?? null },
     { status: ok ? 200 : 500, headers: { "Cache-Control": "no-store" } },

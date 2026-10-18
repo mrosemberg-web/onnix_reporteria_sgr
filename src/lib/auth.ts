@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHash, randomBytes } from "node:crypto";
-import { sql } from "./db";
+import { asegurarConexion, sql } from "./db";
 import { COOKIE_SESION, DURACION_SESION_S, firmarSesion, verificarSesion, type Sesion } from "./token";
 
 export type { Sesion, Rol } from "./token";
@@ -26,6 +26,7 @@ export async function cerrarSesion() {
 export async function obtenerSesion(): Promise<Sesion | null> {
   const s = await verificarSesion((await cookies()).get(COOKIE_SESION)?.value);
   if (!s) return null;
+  await asegurarConexion();
   const [u] = await sql<{ id: number; usuario: string; nombre: string; rol: "admin" | "lector"; activo: boolean }[]>`
     select id, usuario, nombre, rol, activo from usuarios where id = ${s.uid}`;
   if (!u || !u.activo) return null;

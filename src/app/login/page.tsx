@@ -3,6 +3,7 @@ import { obtenerSesion } from "@/lib/auth";
 import { FormIngreso } from "./FormIngreso";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 export const metadata = { title: "Ingresar" };
 
 export default async function Login() {

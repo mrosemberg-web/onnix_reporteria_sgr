@@ -12,6 +12,7 @@
     "crear-admin": "node scripts/crear-admin.mjs"
   },
   "dependencies": {
+    "@vercel/functions": "3.9.9",
     "bcryptjs": "3.0.3",
     "jose": "6.2.12",
     "next": "15.5.27",

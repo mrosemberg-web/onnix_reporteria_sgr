@@ -2,7 +2,7 @@
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { iniciarSesion } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { asegurarConexion, sql } from "@/lib/db";
 import { describirError } from "@/lib/diagnostico";
 
 // Hash de una clave aleatoria: iguala el tiempo de respuesta cuando el usuario no existe.
@@ -19,6 +19,7 @@ export async function ingresar(prev: EstadoForm, fd: FormData): Promise<EstadoFo
   if (!usuario || !clave) return fallo("Ingresá usuario y clave.");
 
   try {
+    await asegurarConexion();
     const [u] = await sql<{ id: number; usuario: string; nombre: string; rol: "admin" | "lector"; clave_hash: string;
                             activo: boolean; bloqueado: boolean }[]>`
       select id, usuario, nombre, rol, clave_hash, activo, coalesce(bloqueado_hasta > now(), false) as bloqueado

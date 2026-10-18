@@ -4,6 +4,9 @@ import { Nav } from "@/components/Nav";
 import { requerirSesion } from "@/lib/auth";
 import { salir } from "./acciones";
 
+// Ninguna pantalla debería tardar más que esto; evita esperas de 5 minutos si algo se cuelga.
+export const maxDuration = 60;
+
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const s = await requerirSesion();
   return (

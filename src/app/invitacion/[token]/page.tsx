@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { hashToken } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { asegurarConexion, sql } from "@/lib/db";
 import { fechaHora } from "@/lib/formato";
 import { FormInvitacion } from "./FormInvitacion";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 export const metadata = { title: "Invitación" };
 
 export default async function Invitacion({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  await asegurarConexion();
   const [inv] = await sql<{ rol: string; expira_en: Date }[]>`
     select rol, expira_en from invitaciones
     where token_hash = ${hashToken(token)} and usada_en is null and not revocada and expira_en > now()`;

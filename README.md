@@ -46,6 +46,17 @@ Si algo falla, el campo `base.motivo` explica la causa. No muestra secretos ni l
 
 Si el ingreso no funciona, la pantalla de login también muestra el motivo y un código: `28P01` es una clave de base incorrecta y `CONNECT_TIMEOUT` es un host equivocado o inaccesible.
 
+### Conexiones en Vercel
+
+Vercel congela las funciones entre requests y, mientras tanto, el pooler de Supabase puede cerrar las conexiones inactivas. Un cliente persistente como postgres.js no se entera y, al reanudar, la consulta queda colgada hasta el límite de la función (error 504 `FUNCTION_INVOCATION_TIMEOUT`). `src/lib/db.ts` lo evita de dos maneras:
+
+- mantiene viva la función (con `waitUntil`) hasta que las conexiones ociosas se cierran, a los 5 segundos;
+- antes de la primera consulta de cada request, si la base estuvo inactiva, hace un `select 1` con 3 segundos de límite y, si no responde, recrea el cliente.
+
+Además, cada pantalla tiene un límite de 60 segundos (`maxDuration`), así que ningún error puede dejar la página esperando 5 minutos.
+
+Conviene que la región de las funciones de Vercel coincida con la de Supabase. Se configura en el proyecto de Vercel o con un `vercel.json` en la raíz, por ejemplo `{ "regions": ["gru1"] }` para Supabase en `sa-east-1` (São Paulo). `/api/salud` informa en qué región corrió la función.
+
 ## Usuarios
 
 - **Ingreso.** Con usuario y clave. La clave se guarda con bcrypt y la sesión es un JWT firmado en una cookie `httpOnly` que dura 8 horas. En cada página se vuelve a verificar contra la base que el usuario siga activo, así que desactivar a alguien corta su acceso de inmediato.
