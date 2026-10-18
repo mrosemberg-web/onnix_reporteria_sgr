@@ -27,7 +27,14 @@ function crear() {
   return postgres(url, {
     // El pooler de Supabase en modo transacción (puerto 6543) no admite prepared statements.
     prepare: false,
-    max: process.env.NODE_ENV === "production" ? 3 : 5,
+    // Sin pipelining: detrás de un pooler en modo transacción (Supavisor), una segunda
+    // consulta enviada por el mismo socket antes de recibir la respuesta de la primera
+    // no se atiende y queda colgada. Con 0, cada conexión lleva una consulta a la vez
+    // y las consultas en paralelo se reparten entre conexiones.
+    // Consecuencia: sql.begin() no funciona con esta opción; usar transaccion() de abajo.
+    // (opción válida de postgres.js 3.4, ausente en sus tipos)
+    ...({ max_pipeline: 0 } as {}),
+    max: process.env.NODE_ENV === "production" ? 4 : 5,
     idle_timeout: INACTIVIDAD_S,
     // Fallar rápido (y mostrar el motivo) en vez de dejar la pantalla esperando.
     connect_timeout: 8,
@@ -115,4 +122,26 @@ async function verificar() {
     actual.end({ timeout: 0 }).catch(() => {});
   }
   estado.ultimoUso = Date.now();
+}
+
+// --- Transacciones -------------------------------------------------------------
+type Reservada = Awaited<ReturnType<Sql["reserve"]>>;
+
+/**
+ * Transacción sobre una conexión reservada (BEGIN/COMMIT/ROLLBACK explícitos).
+ * Reemplaza a sql.begin(), que con max_pipeline: 0 falla con UNSAFE_TRANSACTION.
+ */
+export async function transaccion<T>(fn: (tx: Reservada) => Promise<T>): Promise<T> {
+  const tx = await sql.reserve();
+  try {
+    await tx`begin`;
+    const resultado = await fn(tx);
+    await tx`commit`;
+    return resultado;
+  } catch (e) {
+    await tx`rollback`.catch(() => {});
+    throw e;
+  } finally {
+    tx.release();
+  }
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { sql } from "./db";
+import { transaccion } from "./db";
 import { COLUMNAS_DB, decodificar, leerPlanilla } from "./planilla";
 
 export type ResultadoImportacion =
@@ -12,7 +12,7 @@ export async function importarPlanilla(nombre: string, contenido: ArrayBuffer, u
   if (errores.length) return { ok: false, errores, advertencias };
   if (filas.length === 0) return { ok: false, errores: ["La planilla no contiene requerimientos."], advertencias };
 
-  const cargaId = await sql.begin(async (tx) => {
+  const cargaId = await transaccion(async (tx) => {
     const [carga] = await tx<{ id: number }[]>`
       insert into cargas (archivo, filas, advertencias, cargado_por)
       values (${nombre}, ${filas.length}, ${tx.json(advertencias.slice(0, 500))}, ${usuarioId})

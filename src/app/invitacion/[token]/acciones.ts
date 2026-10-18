@@ -2,7 +2,7 @@
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { hashToken, iniciarSesion, REGLA_USUARIO, validarClave } from "@/lib/auth";
-import { asegurarConexion, sql } from "@/lib/db";
+import { asegurarConexion, transaccion } from "@/lib/db";
 
 export type EstadoInvitacion = { error?: string; nombre?: string; usuario?: string; intento?: number };
 
@@ -22,7 +22,7 @@ export async function aceptarInvitacion(prev: EstadoInvitacion, fd: FormData): P
 
   await asegurarConexion();
   const hash = await bcrypt.hash(clave, 12);
-  const resultado = await sql.begin(async (tx) => {
+  const resultado = await transaccion(async (tx) => {
     const [inv] = await tx<{ id: number; rol: "admin" | "lector" }[]>`
       select id, rol from invitaciones
       where token_hash = ${hashToken(token)} and usada_en is null and not revocada and expira_en > now()
