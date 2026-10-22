@@ -10,7 +10,7 @@ const COLUMNAS = [
   "id_req", "asunto", "departamento", "tipo_requerimiento", "equipo", "estado", "servicio", "aplica_desa", "aplica_test",
   "asignado_a", "horas_desa", "horas_presu_desa", "horas_pausadas_desa", "asignado_testing", "horas_test",
   "horas_presu_test", "horas_pausadas_test", "devoluciones", "horas_pausadas", "fecha_inicio_desa", "fecha_fin_desa",
-  "fecha_inicio_testing", "fecha_fin_testing", "implementacion", "fecha_facturacion", "total_facturar", "lead_cal", "lead_neto",
+  "fecha_inicio_testing", "fecha_fin_testing", "implementacion", "fecha_facturacion", "total_facturar", "lead_hab", "lead_neto",
 ] as const;
 
 function celda(v: unknown) {

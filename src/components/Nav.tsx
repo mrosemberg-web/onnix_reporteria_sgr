@@ -24,6 +24,7 @@ const CURSO: Item[] = [
 ];
 const ADMIN: Item[] = [
   { href: "/admin/carga", texto: "Cargar planillas" },
+  { href: "/admin/feriados", texto: "Feriados" },
   { href: "/admin/usuarios", texto: "Usuarios" },
 ];
 

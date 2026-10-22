@@ -25,12 +25,14 @@ export type CargaSeguimiento = { tipo: string; archivo: string; fecha_corte: str
 
 /** Lee las dos planillas en curso y analiza cada SGR contra la fecha de corte de su carga. */
 export async function cargarSeguimiento() {
-  const [filas, cargas] = await Promise.all([
+  const [filas, cargas, feriados] = await Promise.all([
     sql<FilaSeguimiento[]>`select ${sql(COLUMNAS_SEGUIMIENTO)} from seguimiento order by fase, usuario, id_req`,
     sql<CargaSeguimiento[]>`
       select distinct on (tipo) tipo, archivo, coalesce(fecha_corte, (cargado_en at time zone 'America/Asuncion')::date) as fecha_corte, cargado_en
       from cargas where tipo in ('seguimiento_desa', 'seguimiento_test') order by tipo, id desc`,
+    sql<{ fecha: string }[]>`select fecha from feriados`,
   ]);
+  const fer = new Set(feriados.map((x) => x.fecha));
   const corte = {
     desa: cargas.find((c) => c.tipo === "seguimiento_desa")?.fecha_corte ?? hoyIso(),
     test: cargas.find((c) => c.tipo === "seguimiento_test")?.fecha_corte ?? hoyIso(),
@@ -39,7 +41,7 @@ export async function cargarSeguimiento() {
   for (const fase of ["desa", "test"] as const) {
     const deFase = filas.filter((f) => f.fase === fase);
     const lideres = lideresDe(deFase);
-    for (const f of deFase) analisis.push(analizar(f, corte[fase], lideres));
+    for (const f of deFase) analisis.push(analizar(f, corte[fase], lideres, fer));
   }
   return { analisis, cargas, corte };
 }

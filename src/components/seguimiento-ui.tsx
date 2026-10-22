@@ -105,8 +105,8 @@ export function TablaSgr({ items, corte, conPersona = true }: { items: Analisis[
       <table>
         <thead>
           <tr>
-            <th>SGR</th><th>Asunto</th>{conPersona && <th>Responsable</th>}<th>Etapa</th><th className="n">Días en estado</th>
-            <th>Entrega estimada</th><th>Plan y atraso</th><th className="n">Atraso</th><th>Causa principal</th>
+            <th>SGR</th><th>Asunto</th>{conPersona && <th>Responsable</th>}<th>Etapa</th><th className="n">Días hábiles en estado</th>
+            <th>Entrega estimada</th><th>Plan y atraso</th><th className="n">Atraso (hábiles)</th><th>Causa principal</th>
             <th className="n">Horas</th><th className="n">Consumo</th>
           </tr>
         </thead>
@@ -119,8 +119,8 @@ export function TablaSgr({ items, corte, conPersona = true }: { items: Analisis[
               <td><ChipEtapa a={a} /></td>
               <td className="n">{num(a.diasEnEstado)}{a.pausaSinRegistrar > 1 && (
                 <span className="etiqueta e-leve" style={{ marginLeft: 6 }} title={`${a.pausaSinRegistrar} días hábiles detenido sin horas pausadas registradas`}>Revisar pausa</span>)}</td>
-              <td>{fecha(a.entrega_estimada)}{a.nueva_entrega && a.nueva_entrega !== a.entrega_estimada && <span className="debil"> → {fecha(a.nueva_entrega)}</span>}</td>
-              <td><LineaTiempo inicio={a.fecha_inicio} estimada={a.entrega_estimada} nueva={a.nueva_entrega} corte={corte[a.fase]}
+              <td>{fecha(a.entrega_estimada)}{a.entregaCorregida && a.entregaCorregida !== a.entrega_estimada && <span className="debil" title="Corrida por pausas, en días hábiles"> → {fecha(a.entregaCorregida)}</span>}</td>
+              <td><LineaTiempo inicio={a.fecha_inicio} estimada={a.entrega_estimada} nueva={a.entregaCorregida} corte={corte[a.fase]}
                 fin={a.etapa === "finalizado" ? a.fecha_estado : null} /></td>
               <td className="n">{a.atraso ? `${num(a.atraso)} d` : a.situacion === "sin_plan" ? "–" : "0"}</td>
               <td><ComposicionAtraso a={a} /></td>

@@ -380,7 +380,7 @@ export function LineaTiempo({ inicio, estimada, nueva, corte, fin }: {
   const k = (W - 2) / Math.max(hasta - desde, 1);
   const px = (t: number) => 1 + (t - desde) * k;
   const finPlan = E, finPausa = Math.max(E, N ?? E);
-  const titulo = `Inicio ${inicio}, entrega estimada ${estimada}${nueva && nueva !== estimada ? `, corrida por pausas a ${nueva}` : ""}`;
+  const titulo = `Inicio ${inicio}, entrega estimada ${estimada}${nueva && nueva !== estimada ? `, corregida por pausas al ${nueva}` : ""}`;
   return (
     <svg className="libro" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={titulo}>
       <title>{titulo}</title>

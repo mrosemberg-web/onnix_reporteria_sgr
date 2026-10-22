@@ -9,7 +9,7 @@ import { indice, pctPausa, tiempos } from "@/lib/reportes";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Tiempos y devoluciones" };
 
-const TRAMOS = ["Hasta 7 días", "8 a 15 días", "16 a 30 días", "31 a 60 días", "61 a 90 días", "Más de 90 días"];
+const TRAMOS = ["Hasta 7 días hábiles", "8 a 15", "16 a 30", "31 a 60", "61 a 90", "Más de 90"];
 const GRUPOS = ["Sin devoluciones al cliente", "1 devolución", "2 devoluciones", "3 o más"];
 
 export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -23,12 +23,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const rapidos = tramos.filter((t) => t.tramo <= 3).reduce((s, t) => s + t.sgr, 0);
 
   const lectura: string[] = [];
-  if (totalTramos) lectura.push(`${pct(rapidos / totalTramos)} de los SGR entregados llegaron a producción en 30 días netos o menos, contados desde el inicio de la primera fase hasta la implementación y descontando pausas. Los desestimados no entran en este cálculo.`);
+  if (totalTramos) lectura.push(`${pct(rapidos / totalTramos)} de los SGR entregados llegaron a producción en 30 días hábiles netos o menos, contados desde el inicio de la primera fase hasta la implementación y descontando pausas. Los desestimados no entran en este cálculo.`);
   const pd = pctPausa(desa), pt = pctPausa(test);
-  if (pd !== null || pt !== null) lectura.push(`Las pausas ocupan el ${pct(pd)} del tiempo calendario de desarrollo y el ${pct(pt)} del de testing. Es tiempo en que el SGR estuvo detenido, no tiempo de trabajo. El ${pct(calidad && calidad.horas_pausa_total ? calidad.horas_pausa_con_dev / calidad.horas_pausa_total : null)} de esas horas corresponde a SGR devueltos al cliente.`);
+  if (pd !== null || pt !== null) lectura.push(`Las pausas ocupan el ${pct(pd)} del tiempo hábil de desarrollo y el ${pct(pt)} del de testing. Es tiempo en que el SGR estuvo detenido, no tiempo de trabajo. El ${pct(calidad && calidad.horas_pausa_total ? calidad.horas_pausa_con_dev / calidad.horas_pausa_total : null)} de esas horas corresponde a SGR devueltos al cliente.`);
   if (sinDev?.lead_neto_med != null && conDev.length) {
     const peor = conDev.at(-1)!;
-    lectura.push(`Sin devoluciones al cliente, la mediana de entrega es de ${dias(sinDev.lead_neto_med)} netos y ${dias(sinDev.lead_cal_med)} calendario; con ${GRUPOS[peor.grupo].toLowerCase()} pasa a ${dias(peor.lead_neto_med)} netos y ${dias(peor.lead_cal_med)} calendario. La diferencia entre calendario y neto es la espera del cliente.`);
+    lectura.push(`Sin devoluciones al cliente, la mediana de entrega es de ${dias(sinDev.lead_neto_med)} netos y ${dias(sinDev.lead_hab_med)} con pausas; con ${GRUPOS[peor.grupo].toLowerCase()} pasa a ${dias(peor.lead_neto_med)} netos y ${dias(peor.lead_hab_med)} con pausas. La diferencia entre ambos es la espera del cliente.`);
     const idxSin = indice(sinDev);
     const dev = conDev.reduce((a, g) => ({ presu_reg: a.presu_reg + g.presu_reg, real_reg: a.real_reg + g.real_reg }), { presu_reg: 0, real_reg: 0 });
     const idxCon = indice(dev);
@@ -40,11 +40,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   return (
     <>
       <Encabezado titulo={`Tiempos y devoluciones ${textoAnios(f)}`} op={op} f={f}
-        bajada="Duración de cada fase y del ciclo completo, separando el tiempo calendario del tiempo en pausa. Las pausas incluyen la espera cuando un SGR se devuelve al cliente por falta de datos o consultas." />
+        bajada="Duración de cada fase y del ciclo completo, en días hábiles (lunes a viernes, sin feriados), separando el tiempo de trabajo del tiempo en pausa. Las pausas incluyen la espera cuando un SGR se devuelve al cliente por falta de datos o consultas." />
 
       <section className="banda">
-        <Indicador nombre="Desarrollo, mediana" valor={dias(desa.dias_netos_med)} nota={`${dias(desa.dias_cal_med)} calendario`} />
-        <Indicador nombre="Testing, mediana" valor={dias(test.dias_netos_med)} nota={`${dias(test.dias_cal_med)} calendario`} />
+        <Indicador nombre="Desarrollo, mediana" valor={dias(desa.dias_netos_med)} nota={`${dias(desa.dias_hab_med)} con pausas`} />
+        <Indicador nombre="Testing, mediana" valor={dias(test.dias_netos_med)} nota={`${dias(test.dias_hab_med)} con pausas`} />
         <Indicador nombre="Horas pausadas" valor={horas(desa.horas_pausadas + test.horas_pausadas)} nota="desarrollo y testing" />
         <Indicador nombre="Devueltos al cliente" valor={num(conDev.reduce((s, g) => s + g.sgr, 0))}
           nota={`de ${num(porDevolucion.reduce((s, g) => s + g.sgr, 0))} SGR entregados`} />
@@ -66,7 +66,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
               <thead><tr><th /><th className="n">Desarrollo</th><th className="n">Testing</th></tr></thead>
               <tbody>
                 <tr><td>SGR con la fase</td><td className="n">{num(desa.sgr)}</td><td className="n">{num(test.sgr)}</td></tr>
-                <tr><td>Mediana en días calendario</td><td className="n">{dias(desa.dias_cal_med)}</td><td className="n">{dias(test.dias_cal_med)}</td></tr>
+                <tr><td>Mediana en días hábiles, con pausas</td><td className="n">{dias(desa.dias_hab_med)}</td><td className="n">{dias(test.dias_hab_med)}</td></tr>
                 <tr><td>Mediana sin pausas</td><td className="n">{dias(desa.dias_netos_med)}</td><td className="n">{dias(test.dias_netos_med)}</td></tr>
                 <tr><td>Horas pausadas</td><td className="n">{horas(desa.horas_pausadas)}</td><td className="n">{horas(test.horas_pausadas)}</td></tr>
                 <tr><td>Parte del tiempo en pausa</td><td className="n">{pct(pd)}</td><td className="n">{pct(pt)}</td></tr>
@@ -92,7 +92,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <table>
             <thead>
               <tr><th>Servicio</th><th className="n">SGR entregados</th><th className="n">Entrega, mediana sin pausas</th>
-                <th className="n">Entrega, mediana calendario</th><th className="n">Pausa promedio por SGR</th></tr>
+                <th className="n">Entrega, mediana con pausas</th><th className="n">Pausa promedio por SGR</th></tr>
             </thead>
             <tbody>
               {porServicio.map((r) => (
@@ -100,7 +100,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
                   <td><span className={`etiqueta ${claseServicio(r.servicio)}`}>{nombreServicio(r.servicio)}</span></td>
                   <td className="n">{num(r.sgr)}</td>
                   <td className="n">{dias(r.lead_neto_med)}</td>
-                  <td className="n">{dias(r.lead_cal_med)}</td>
+                  <td className="n">{dias(r.lead_hab_med)}</td>
                   <td className="n">{horas(r.pausa_prom)}</td>
                 </tr>
               ))}
@@ -119,7 +119,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
             <thead>
               <tr>
                 <th>Devoluciones</th><th className="n">SGR</th><th className="n">Entrega, mediana sin pausas</th>
-                <th className="n">Entrega, mediana calendario</th><th className="n">Pausa promedio por SGR</th><th className="n">Índice de cumplimiento</th>
+                <th className="n">Entrega, mediana con pausas</th><th className="n">Pausa promedio por SGR</th><th className="n">Índice de cumplimiento</th>
               </tr>
             </thead>
             <tbody>
@@ -128,7 +128,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
                   <td>{GRUPOS[g.grupo]}</td>
                   <td className="n">{num(g.sgr)}</td>
                   <td className="n">{dias(g.lead_neto_med)}</td>
-                  <td className="n">{dias(g.lead_cal_med)}</td>
+                  <td className="n">{dias(g.lead_hab_med)}</td>
                   <td className="n">{horas(g.pausa_prom)}</td>
                   <td className="n"><EtiquetaIndice valor={indice(g)} /></td>
                 </tr>
@@ -147,7 +147,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <table>
             <thead>
               <tr><th>SGR</th><th>Asunto</th><th>Desarrollo</th><th>Testing</th><th className="n">Devoluciones al cliente</th>
-                <th className="n">Horas pausadas</th><th className="n">Entrega calendario</th><th className="n">Entrega sin pausas</th></tr>
+                <th className="n">Horas pausadas</th><th className="n">Entrega con pausas</th><th className="n">Entrega sin pausas</th></tr>
             </thead>
             <tbody>
               {masPausados.map((r) => (
@@ -158,7 +158,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
                   <td>{r.asignado_testing ?? "–"}</td>
                   <td className="n">{num(r.devoluciones)}</td>
                   <td className="n">{horas(r.horas_pausadas)}</td>
-                  <td className="n">{dias(r.lead_cal)}</td>
+                  <td className="n">{dias(r.lead_hab)}</td>
                   <td className="n">{dias(r.lead_neto)}</td>
                 </tr>
               ))}

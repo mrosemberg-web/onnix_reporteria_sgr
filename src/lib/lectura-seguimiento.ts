@@ -20,7 +20,7 @@ export function lecturaSeguimiento(items: Analisis[]): string[] {
 
   if (r.diasAtraso > 0) {
     const ext = r.causas.pausas + r.causas.cliente;
-    out.push(`De los ${num(r.diasAtraso)} días de atraso acumulados, ${pct(ext / r.diasAtraso)} se explican por espera del cliente y pausas anteriores, ${pct(r.causas.devoluciones / r.diasAtraso)} por devoluciones de testing, ${pct(r.causas.pausa / r.diasAtraso)} por pausas sin motivo registrado y ${pct(r.causas.ejecucion / r.diasAtraso)} por ejecución.`);
+    out.push(`De los ${num(r.diasAtraso)} días hábiles de atraso acumulados, ${pct(ext / r.diasAtraso)} se explican por espera del cliente y pausas anteriores, ${pct(r.causas.devoluciones / r.diasAtraso)} por devoluciones de testing, ${pct(r.causas.pausa / r.diasAtraso)} por pausas sin motivo registrado y ${pct(r.causas.ejecucion / r.diasAtraso)} por ejecución.`);
   }
 
   const ejec = sgr.filter((a) => a.etapa !== "finalizado" && a.causas.ejecucion > 0);
@@ -39,7 +39,7 @@ export function lecturaSeguimiento(items: Analisis[]): string[] {
   const cliente = sgr.filter((a) => a.etapa === "cliente" && a.diasEnEstado != null);
   if (cliente.length) {
     const mas = [...cliente].sort((a, b) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0))[0];
-    out.push(`${num(cliente.length)} SGR esperan respuesta o pruebas del cliente; la mitad lleva más de ${dias(mediana(cliente.map((a) => a.diasEnEstado!)))} en ese estado. El más antiguo es el SGR ${mas.id_req}, con ${dias(mas.diasEnEstado)}.`);
+    out.push(`${num(cliente.length)} SGR esperan respuesta o pruebas del cliente; la mitad lleva más de ${dias(mediana(cliente.map((a) => a.diasEnEstado!)))} hábiles en ese estado. El más antiguo es el SGR ${mas.id_req}, con ${dias(mas.diasEnEstado)} hábiles.`);
   }
 
   const tst = sgr.filter((a) => a.fase === "test");

@@ -68,10 +68,10 @@ function Tarjeta({ items, corte }: { items: Analisis[]; corte: string }) {
               <span className="meta">
                 <ChipSituacion a={a} />
                 <ChipEtapa a={a} />
-                {a.entrega_estimada && <LineaTiempo inicio={a.fecha_inicio} estimada={a.entrega_estimada} nueva={a.nueva_entrega} corte={corte}
+                {a.entrega_estimada && <LineaTiempo inicio={a.fecha_inicio} estimada={a.entrega_estimada} nueva={a.entregaCorregida} corte={corte}
                   fin={a.etapa === "finalizado" ? a.fecha_estado : null} />}
                 <span className="debil">
-                  {a.entrega_estimada ? `Entrega ${fecha(a.nueva_entrega ?? a.entrega_estimada)}` : "Sin fecha"}
+                  {a.entrega_estimada ? `Entrega ${fecha(a.entregaCorregida ?? a.entrega_estimada)}` : "Sin fecha"}
                   {a.situacion === "atrasado" && a.causaPrincipal && <>; {CAUSAS[a.causaPrincipal].nombre.toLowerCase()}</>}
                   {a.fase === "test" && (a.devoluciones ?? 0) > 0 && <>; {a.devoluciones} devoluciones</>}
                 </span>

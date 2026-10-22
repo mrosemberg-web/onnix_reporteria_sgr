@@ -50,7 +50,7 @@ export default async function PaginaResumen({ searchParams }: { searchParams: Pr
       <section className="banda" aria-label="Indicadores">
         <Indicador nombre="Horas trabajadas" valor={horas(kpis.horas_real_total)} nota={`de ${horas(kpis.horas_presu_total)} presupuestadas`} />
         <Indicador nombre="Índice de cumplimiento" valor={<EtiquetaIndice valor={idxGlobal} />} nota="presupuestadas ÷ trabajadas" />
-        <Indicador nombre="Tiempo de entrega" valor={dias(kpis.lead_neto_med)} nota={`mediana sin pausas; ${dias(kpis.lead_cal_med)} calendario`} />
+        <Indicador nombre="Tiempo de entrega" valor={dias(kpis.lead_neto_med)} nota={`días hábiles, mediana sin pausas; ${dias(kpis.lead_hab_med)} con pausas`} />
         <Indicador nombre="Devueltos al cliente" valor={pct(kpis.sgr ? kpis.sgr_con_devolucion / kpis.sgr : 0)}
           nota={`${num(kpis.sgr_con_devolucion)} SGR por falta de datos o consultas`} />
         <Indicador nombre="Desestimados por el cliente" valor={num(kpis.desestimados)}
@@ -98,7 +98,7 @@ function ResumenFase({ nombre, clase, a, filasExtra, extra }: {
         <dt>Horas presupuestadas (de esos SGR)</dt><dd>{horas(a.presu_reg)}</dd>
         <dt>Índice de cumplimiento</dt><dd><EtiquetaIndice valor={indice(a)} /></dd>
         <dt>Dentro del presupuesto</dt><dd>{conHoras ? pct(a.dentro / conHoras) : "–"}</dd>
-        <dt>Duración mediana</dt><dd>{dias(a.dias_netos_med)} netos, {dias(a.dias_cal_med)} calendario</dd>
+        <dt>Duración mediana (días hábiles)</dt><dd>{dias(a.dias_netos_med)} netos, {dias(a.dias_hab_med)} con pausas</dd>
         <dt>Tiempo en pausa</dt><dd>{pct(pctPausa(a))}</dd>
       </dl>
       <div style={{ marginTop: 16 }}>

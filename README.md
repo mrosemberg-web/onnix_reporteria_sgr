@@ -57,6 +57,15 @@ Además, cada pantalla tiene un límite de 60 segundos (`maxDuration`), así que
 
 Conviene que la región de las funciones de Vercel coincida con la de Supabase. Se configura en el proyecto de Vercel o con un `vercel.json` en la raíz, por ejemplo `{ "regions": ["gru1"] }` para Supabase en `sa-east-1` (São Paulo). `/api/salud` informa en qué región corrió la función.
 
+## Feriados
+
+En **Administración › Feriados** se mantiene la lista de días no laborables. Viene precargada con los feriados nacionales de Paraguay de 2025 y 2026, con sus traslados y feriados extraordinarios. En 2025: Día de los Héroes al 3 de marzo y Paz del Chaco al 16 de junio (Decreto 3047), y los feriados extraordinarios del 5 de setiembre (Decreto 4522) y del 26 de diciembre (Decreto 5040). En 2026, según la Ley 7544/2025:
+
+- los trasladados: Día de los Héroes al 2 de marzo, Jura de la Constitución al 22 de junio y Batalla de Boquerón al 28 de septiembre (Decreto 6601);
+- el feriado extraordinario del 30 de junio (Decreto 6280).
+
+Se carga la fecha en que efectivamente no se trabaja. Los cambios se aplican al instante en todos los reportes. Para años anteriores o siguientes hay que cargar sus feriados; sin ellos, esos años cuentan como hábiles todos los días de lunes a viernes.
+
 ## Usuarios
 
 - **Ingreso.** Con usuario y clave. La clave se guarda con bcrypt y la sesión es un JWT firmado en una cookie `httpOnly` que dura 8 horas. En cada página se vuelve a verificar contra la base que el usuario siga activo, así que desactivar a alguien corta su acceso de inmediato.
@@ -80,7 +89,8 @@ Están en las vistas `v_requerimientos` y `v_fases` del archivo de migración, p
 - **Equipos DITA y DPJ.** «DESARROLLO IT ALIANZA - (DITA)» y «DESARROLLO FPJ - (DPJ)» solo cuentan **testing**, salvo que el SGR tenga horas presupuestadas de desarrollo. En ese caso también cuenta la fase de desarrollo.
 - **Resto de equipos.** La fase de desarrollo existe si hay horas trabajadas o presupuestadas de desarrollo. La de testing existe si hay horas trabajadas o presupuestadas de testing. Se decide por horas y no por fechas, porque la planilla trae fechas de fin aun cuando la fase no existió.
 - **Fases independientes.** Desarrollo y testing se miden por separado, cada uno con su fecha de inicio y fin, porque no son secuenciales.
-- **Pausas.** Las horas pausadas se consideran tiempo calendario detenido: *días netos = días calendario (contados inclusive) − horas pausadas ÷ 8*. Ocho horas pausadas equivalen a un día, la misma regla que usa el sistema para correr la entrega estimada.
+- **Días hábiles.** Todos los plazos se cuentan en días hábiles: de lunes a viernes, sin los feriados de la tabla `feriados`, ambos extremos inclusive. Es el mismo criterio con el que el sistema de gestión calcula la entrega estimada desde la fecha de inicio.
+- **Pausas.** *Días netos = días hábiles − horas pausadas ÷ 8*: ocho horas pausadas equivalen a un día hábil.
 - **Tiempo de entrega.** Va desde el inicio de la primera fase que aplique hasta la fecha de implementación, descontando las «Horas Pausadas» totales del SGR.
 - **Desarrollo y Testing como servicios.** Un SGR es un **desarrollo de Onnix** solo si tiene horas presupuestadas de desarrollo, en cualquier equipo. Sin presupuesto de desarrollo nunca cuenta como desarrollo entregado, aunque tenga horas o importe cargados; esas horas se informan aparte como «horas de desarrollo sin presupuesto». **Testing** es un servicio adicional que se presta sobre desarrollos de Onnix y sobre desarrollos internos del cliente. Cada SGR tiene un servicio: *Desarrollo con testing*, *Desarrollo sin testing*, *Solo testing (desarrollo del cliente)* o *Sin horas presupuestadas*.
 - **Estados.** PRO es *Finalizado en producción*, PAP es *Pase a producción* (terminado, todavía no pasado a PRO) y DST es *Desestimado por el cliente*.
@@ -123,9 +133,9 @@ El tipo de cada archivo se reconoce por sus encabezados y cada planilla reemplaz
 
 ### Cómo se mide el atraso
 
-Se mide en días de calendario entre la **entrega estimada original** y la fecha de corte (o la fecha en que la fase se dio por finalizada), y se reparte en causas en este orden:
+Se mide en **días hábiles** posteriores a la **entrega estimada original** y la fecha de corte (o la fecha en que la fase se dio por finalizada), y se reparte en causas en este orden:
 
-1. **Pausas**: lo que el sistema corrió la entrega (Nueva entrega estimada − Entrega estimada; 8 horas pausadas equivalen a 1 día). Las horas pausadas ya incluyen la detención actual. Si hoy el SGR está detenido, la parte de las pausas que corresponde a esa detención (días hábiles en el estado actual) se atribuye a su motivo:
+1. **Pausas**: horas pausadas de la fase más otras horas pausadas, ÷ 8, en días hábiles. Corren la entrega estimada a la **entrega corregida**, que se calcula sumando esos días hábiles. Las horas pausadas ya incluyen la detención actual. Si hoy el SGR está detenido, la parte de las pausas que corresponde a esa detención (días hábiles en el estado actual) se atribuye a su motivo:
    - **espera del cliente**: *Aguardando retorno FPJ*, *Pendiente de Pruebas UAT* o *Devuelto por Cambios en Requerimiento*;
    - **devolución de testing**: *Devuelto al Desarrollador…*;
    - **pausa sin motivo**: *Testing en Pausa*.

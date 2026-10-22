@@ -30,7 +30,7 @@ export function lecturaFase(fz: Fase, t: AggFase, resp: FilaResponsable[]): stri
   const pp = pctPausa(t);
   if (pp !== null && pp > 0.005) {
     out.push(
-      `El ${pct(pp)} del tiempo calendario de ${NOMBRE[fz]} estuvo en pausa (${horas(t.horas_pausadas)} acumuladas), tiempo detenido que incluye la espera de respuestas del cliente. Descontando pausas, la mediana de duración baja de ${dias(t.dias_cal_med)} a ${dias(t.dias_netos_med)}.`
+      `El ${pct(pp)} del tiempo hábil de ${NOMBRE[fz]} estuvo en pausa (${horas(t.horas_pausadas)} acumuladas), tiempo detenido que incluye la espera de respuestas del cliente. Descontando pausas, la mediana de duración baja de ${dias(t.dias_hab_med)} a ${dias(t.dias_netos_med)} hábiles.`
     );
   }
 

@@ -37,12 +37,12 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
   return (
     <>
       <EncabezadoSeguimiento titulo="Requerimientos en curso" op={op} f={f} cargas={cargas}
-        bajada="Cómo vienen en el tiempo los SGR que todavía no llegaron a producción y por qué se atrasan: espera del cliente, devoluciones de testing o ejecución del equipo. El atraso se mide contra la entrega estimada original." />
+        bajada="Cómo vienen en el tiempo los SGR que todavía no llegaron a producción y por qué se atrasan: espera del cliente, devoluciones de testing o ejecución del equipo. El atraso se mide en días hábiles contra la entrega estimada original." />
 
       <section className="banda" aria-label="Indicadores">
         <Indicador nombre="SGR en curso" valor={num(sgr.length)} nota={`${num(porFase.desa.length)} en desarrollo, ${num(porFase.test.length)} en testing`} />
         <Indicador nombre="Atrasados" valor={num(r.atrasados)} nota={conFecha ? `${pct(r.atrasados / conFecha)} de los que tienen fecha` : undefined} />
-        <Indicador nombre="Días de atraso" valor={num(r.diasAtraso)}
+        <Indicador nombre="Días hábiles de atraso" valor={num(r.diasAtraso)}
           nota={r.diasAtraso ? `${pct((r.causas.pausas + r.causas.cliente) / r.diasAtraso)} por cliente y pausas anteriores; ${pct(r.causas.ejecucion / r.diasAtraso)} por ejecución` : undefined} />
         <Indicador nombre="Esperando al cliente" valor={num(cliente.length)}
           nota={cliente.length ? `mediana de ${dias(mediana(cliente.map((a) => a.diasEnEstado ?? 0)))} en espera` : undefined} />
@@ -57,7 +57,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
       <section className="panel">
         <div className="panel-cab">
           <h2>¿Por qué se atrasan?</h2>
-          <p>Días de atraso de los SGR que todavía no terminaron su fase, según la causa.</p>
+          <p>Días hábiles de atraso de los SGR que todavía no terminaron su fase, según la causa.</p>
         </div>
         <BarrasApiladasH series={ORDEN_CAUSAS.map((c) => ({ nombre: CAUSAS[c].nombre, color: CAUSAS[c].color }))}
           formato={(v) => num(v)} leyenda={false}
@@ -122,7 +122,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
       <section className="panel">
         <div className="panel-cab">
           <h2>Los SGR más atrasados</h2>
-          <p>La línea muestra el plan (azul), el corrimiento por pausas (gris) y el atraso (rojo); la marca negra es la fecha de corte.</p>
+          <p>La línea muestra el plan (azul), el corrimiento por pausas (gris) y el atraso (rojo); la marca negra es la fecha de corte. Atraso en días hábiles.</p>
         </div>
         <TablaSgr items={masAtrasados} corte={corte} />
       </section>
@@ -135,7 +135,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
           </div>
           <div className="tabla-env">
             <table>
-              <thead><tr><th>SGR</th><th>Asunto</th><th>Fase</th><th>Responsable</th><th>Estado</th><th>Desde</th><th className="n">Días esperando</th><th className="n">Atraso</th></tr></thead>
+              <thead><tr><th>SGR</th><th>Asunto</th><th>Fase</th><th>Responsable</th><th>Estado</th><th>Desde</th><th className="n">Días hábiles esperando</th><th className="n">Atraso</th></tr></thead>
               <tbody>
                 {cliente.map((a) => (
                   <tr key={`${a.fase}-${a.id_req}`}>

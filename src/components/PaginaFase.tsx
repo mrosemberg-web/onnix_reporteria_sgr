@@ -59,7 +59,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
         <Indicador nombre="Horas trabajadas" valor={horas(total.real_reg)} nota={`de ${horas(total.presu_reg)} presupuestadas`} />
         <Indicador nombre="Índice de cumplimiento" valor={<EtiquetaIndice valor={indice(total)} />} nota="presupuestadas ÷ trabajadas" />
         <Indicador nombre="Dentro del presupuesto" valor={conHoras ? pct(total.dentro / conHoras) : "–"} nota={`${num(total.dentro)} de ${num(conHoras)} SGR`} />
-        <Indicador nombre="Duración mediana" valor={dias(total.dias_netos_med)} nota={`sin pausas; ${dias(total.dias_cal_med)} calendario`} />
+        <Indicador nombre="Duración mediana" valor={dias(total.dias_netos_med)} nota={`días hábiles sin pausas; ${dias(total.dias_hab_med)} con pausas`} />
         <Indicador nombre="Devueltos al cliente" valor={num(total.sgr_con_devolucion)} nota={`SGR por falta de datos o consultas (${num(total.devoluciones)} devoluciones)`} />
       </section>
 

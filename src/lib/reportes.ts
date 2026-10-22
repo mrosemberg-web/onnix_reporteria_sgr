@@ -48,10 +48,10 @@ const aggFase = () => sql`
   coalesce(sum(horas_pausadas), 0)::float8 as horas_pausadas,
   coalesce(sum(devoluciones), 0)::int as devoluciones,
   count(*) filter (where devoluciones > 0) as sgr_con_devolucion,
-  percentile_cont(0.5) within group (order by dias_cal)::float8 as dias_cal_med,
+  percentile_cont(0.5) within group (order by dias_hab)::float8 as dias_hab_med,
   percentile_cont(0.5) within group (order by dias_netos)::float8 as dias_netos_med,
-  coalesce(sum(dias_cal), 0)::float8 as dias_cal_sum,
-  coalesce(sum(least(horas_pausadas / 8.0, dias_cal)) filter (where dias_cal is not null), 0)::float8 as dias_pausa_sum,
+  coalesce(sum(dias_hab), 0)::float8 as dias_hab_sum,
+  coalesce(sum(least(horas_pausadas / 8.0, dias_hab)) filter (where dias_hab is not null), 0)::float8 as dias_pausa_sum,
   coalesce(sum(importe), 0)::float8 as importe`;
 
 export type AggFase = {
@@ -59,19 +59,19 @@ export type AggFase = {
   dentro: number; leve: number; sobre: number; sin_registro: number;
   horas_excedidas: number; horas_ahorradas: number; horas_pausadas: number;
   devoluciones: number; sgr_con_devolucion: number;
-  dias_cal_med: number | null; dias_netos_med: number | null; dias_cal_sum: number; dias_pausa_sum: number;
+  dias_hab_med: number | null; dias_netos_med: number | null; dias_hab_sum: number; dias_pausa_sum: number;
   importe: number;
 };
 
 export const AGG_VACIO: AggFase = {
   sgr: 0, entregados: 0, desestimados: 0, solo_test: 0, solo_test_entregados: 0, horas_real: 0, horas_presu: 0, real_reg: 0, presu_reg: 0, dentro: 0, leve: 0, sobre: 0,
   sin_registro: 0, horas_excedidas: 0, horas_ahorradas: 0, horas_pausadas: 0, devoluciones: 0,
-  sgr_con_devolucion: 0, dias_cal_med: null, dias_netos_med: null, dias_cal_sum: 0, dias_pausa_sum: 0, importe: 0,
+  sgr_con_devolucion: 0, dias_hab_med: null, dias_netos_med: null, dias_hab_sum: 0, dias_pausa_sum: 0, importe: 0,
 };
 
 /** Índice de cumplimiento: horas presupuestadas ÷ horas trabajadas (≥ 1 = dentro de presupuesto). */
 export const indice = (a: { presu_reg: number; real_reg: number }) => (a.real_reg > 0 ? a.presu_reg / a.real_reg : null);
-export const pctPausa = (a: AggFase) => (a.dias_cal_sum > 0 ? a.dias_pausa_sum / a.dias_cal_sum : null);
+export const pctPausa = (a: AggFase) => (a.dias_hab_sum > 0 ? a.dias_pausa_sum / a.dias_hab_sum : null);
 
 // ---------------------------------------------------------------------------
 
@@ -103,7 +103,7 @@ export type KpisReq = {
   horas_desestimados: number; facturado_desestimados: number; devoluciones_sin_pausa: number;
   facturado: number; facturado_desa: number; facturado_test: number; facturado_test_cliente: number;
   pendiente_facturar: number; sgr_pendiente_facturar: number; devoluciones: number; sgr_con_devolucion: number;
-  lead_cal_med: number | null; lead_neto_med: number | null; horas_pausadas: number;
+  lead_hab_med: number | null; lead_neto_med: number | null; horas_pausadas: number;
   horas_real_total: number; horas_presu_total: number;
 };
 
@@ -136,7 +136,7 @@ export async function resumen(f: Filtros) {
              count(*) filter (where fecha_facturacion is null) as sgr_pendiente_facturar,
              coalesce(sum(devoluciones), 0)::int as devoluciones,
              count(*) filter (where devoluciones > 0) as sgr_con_devolucion,
-             percentile_cont(0.5) within group (order by lead_cal)::float8 as lead_cal_med,
+             percentile_cont(0.5) within group (order by lead_hab)::float8 as lead_hab_med,
              percentile_cont(0.5) within group (order by lead_neto)::float8 as lead_neto_med,
              coalesce(sum(horas_pausadas), 0)::float8 as horas_pausadas,
              coalesce(sum(horas_real_total), 0)::float8 as horas_real_total,
@@ -212,18 +212,18 @@ export async function tiempos(f: Filtros) {
       select case when lead_neto <= 7 then 1 when lead_neto <= 15 then 2 when lead_neto <= 30 then 3
                   when lead_neto <= 60 then 4 when lead_neto <= 90 then 5 else 6 end as tramo, count(*) as sgr
       from v_requerimientos where ${filtro(f)} and lead_neto is not null group by 1 order by 1`,
-    sql<{ grupo: number; sgr: number; lead_neto_med: number | null; lead_cal_med: number | null; pausa_prom: number;
+    sql<{ grupo: number; sgr: number; lead_neto_med: number | null; lead_hab_med: number | null; pausa_prom: number;
           real_reg: number; presu_reg: number }[]>`
       select least(devoluciones, 3) as grupo, count(*) as sgr,
              percentile_cont(0.5) within group (order by lead_neto)::float8 as lead_neto_med,
-             percentile_cont(0.5) within group (order by lead_cal)::float8 as lead_cal_med,
+             percentile_cont(0.5) within group (order by lead_hab)::float8 as lead_hab_med,
              coalesce(avg(horas_pausadas), 0)::float8 as pausa_prom,
              coalesce(sum(horas_real_total) filter (where horas_real_total > 0), 0)::float8 as real_reg,
              coalesce(sum(horas_presu_total) filter (where horas_real_total > 0), 0)::float8 as presu_reg
       from v_requerimientos where ${filtro(f)} and entregado group by 1 order by 1`,
-    sql<{ id_req: string; asunto: string | null; devoluciones: number; horas_pausadas: number; lead_cal: number | null;
+    sql<{ id_req: string; asunto: string | null; devoluciones: number; horas_pausadas: number; lead_hab: number | null;
           lead_neto: number | null; asignado_a: string | null; asignado_testing: string | null }[]>`
-      select id_req, asunto, devoluciones, horas_pausadas::float8, lead_cal, lead_neto::float8, asignado_a, asignado_testing
+      select id_req, asunto, devoluciones, horas_pausadas::float8, lead_hab, lead_neto::float8, asignado_a, asignado_testing
       from v_requerimientos where ${filtro(f)} and horas_pausadas > 0
       order by horas_pausadas desc limit 12`,
     sql<{ dev_sin_pausa: number; pausa_sin_dev: number; horas_pausa_con_dev: number; horas_pausa_total: number }[]>`
@@ -232,10 +232,10 @@ export async function tiempos(f: Filtros) {
              coalesce(sum(horas_pausadas) filter (where devoluciones > 0), 0)::float8 as horas_pausa_con_dev,
              coalesce(sum(horas_pausadas), 0)::float8 as horas_pausa_total
       from v_requerimientos where ${filtro(f)} and entregado`,
-    sql<{ servicio: string; sgr: number; lead_neto_med: number | null; lead_cal_med: number | null; pausa_prom: number }[]>`
+    sql<{ servicio: string; sgr: number; lead_neto_med: number | null; lead_hab_med: number | null; pausa_prom: number }[]>`
       select servicio, count(*) as sgr,
              percentile_cont(0.5) within group (order by lead_neto)::float8 as lead_neto_med,
-             percentile_cont(0.5) within group (order by lead_cal)::float8 as lead_cal_med,
+             percentile_cont(0.5) within group (order by lead_hab)::float8 as lead_hab_med,
              coalesce(avg(horas_pausadas), 0)::float8 as pausa_prom
       from v_requerimientos where ${filtro(f)} and entregado group by servicio`,
   ]);
@@ -297,7 +297,7 @@ export type FilaDetalle = {
   devoluciones: number; horas_pausadas: number; horas_pausadas_desa: number; horas_pausadas_test: number;
   fecha_inicio_desa: string | null; fecha_fin_desa: string | null; fecha_inicio_testing: string | null; fecha_fin_testing: string | null;
   implementacion: string | null; fecha_facturacion: string | null; total_facturar: number;
-  lead_cal: number | null; lead_neto: number | null;
+  lead_hab: number | null; lead_neto: number | null;
 };
 
 export async function detalle(f: Filtros) {
@@ -306,7 +306,7 @@ export async function detalle(f: Filtros) {
            asignado_a, asignado_testing, horas_desa, horas_presu_desa, horas_test, horas_presu_test,
            devoluciones, horas_pausadas, horas_pausadas_desa, horas_pausadas_test,
            fecha_inicio_desa, fecha_fin_desa, fecha_inicio_testing, fecha_fin_testing,
-           implementacion, fecha_facturacion, total_facturar, lead_cal, lead_neto::float8
+           implementacion, fecha_facturacion, total_facturar, lead_hab, lead_neto::float8
     from v_requerimientos where ${filtro(f)}
     order by implementacion desc, id_req`;
 }

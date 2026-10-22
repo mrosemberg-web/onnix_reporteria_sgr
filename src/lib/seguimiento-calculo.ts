@@ -1,10 +1,11 @@
 // Análisis de los requerimientos EN CURSO (sin dependencias de servidor).
 //
-// Atraso: días de calendario entre la entrega estimada ORIGINAL y la fecha de corte
-// (o la fecha en que la fase se dio por finalizada). Se descompone en causas:
+// Todo se cuenta en DÍAS HÁBILES: de lunes a viernes, sin los feriados cargados.
+// Atraso: días hábiles posteriores a la entrega estimada ORIGINAL hasta la fecha de
+// corte (o la fecha en que la fase se dio por finalizada). Se descompone en causas:
 //
-//   1. Pausas: lo que el propio sistema ya corrió la entrega por pausas
-//      (Nueva entrega estimada − Entrega estimada; 8 h pausadas = 1 día). Las horas
+//   1. Pausas: horas pausadas de la fase (pausas de la fase + otras pausas) ÷ 8,
+//      en días hábiles. Corren la entrega a la "entrega corregida". Las horas
 //      pausadas incluyen la detención actual. Si hoy el SGR está detenido, la parte
 //      de esas pausas que corresponde a la detención actual (días hábiles en el
 //      estado) se atribuye a su motivo: espera del cliente, devolución de testing o
@@ -97,6 +98,8 @@ export type Analisis = FilaSeguimiento & {
   consumo: number | null;
   /** días transcurridos (sin pausas) ÷ días planificados, solo con fechas de plan */
   avance: number | null;
+  /** Entrega estimada corrida por las pausas, en días hábiles. */
+  entregaCorregida: string | null;
   /** Sub-diagnóstico del atraso por ejecución */
   ejecucion: Ejecucion | null;
   horasExcedidas: number;
@@ -106,43 +109,60 @@ export type Analisis = FilaSeguimiento & {
 
 const DIA = 86_400_000;
 const fecha = (s: string | null) => (s ? Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) : null);
-const dias = (a: number, b: number) => Math.round((b - a) / DIA);
-/** Días hábiles (lunes a viernes) entre dos fechas, sin contar la primera. */
-function diasHabiles(a: number, b: number) {
+const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+
+/** Fechas de feriados ('AAAA-MM-DD'). */
+export type Feriados = Set<string>;
+
+function esHabil(t: number, fer: Feriados) {
+  const d = new Date(t).getUTCDay();
+  return d !== 0 && d !== 6 && !fer.has(iso(t));
+}
+/** Días hábiles entre dos fechas, ambas inclusive (0 si el rango está vacío). */
+export function habiles(desde: number, hasta: number, fer: Feriados) {
   let n = 0;
-  for (let t = a + DIA; t <= b; t += DIA) {
-    const d = new Date(t).getUTCDay();
-    if (d !== 0 && d !== 6) n++;
-  }
+  for (let t = desde; t <= hasta; t += DIA) if (esHabil(t, fer)) n++;
   return n;
 }
+/** Días hábiles posteriores a "desde" hasta "hasta" inclusive. */
+const habilesDespues = (desde: number, hasta: number, fer: Feriados) => habiles(desde + DIA, hasta, fer);
+/** La fecha que resulta de sumar n días hábiles a otra. */
+function sumarHabiles(desde: number, n: number, fer: Feriados) {
+  let t = desde;
+  for (let k = 0; k < n; ) { t += DIA; if (esHabil(t, fer)) k++; }
+  return t;
+}
 
-export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<string>): Analisis {
+export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<string>, fer: Feriados = new Set()): Analisis {
   const C = fecha(corteIso)!;
   const E = fecha(f.entrega_estimada);
-  const N = fecha(f.nueva_entrega) ?? E;
   const I = fecha(f.fecha_inicio);
   const S = fecha(f.fecha_estado);
+  // Pausas de la fase en días hábiles (8 h = 1 día) y entrega corregida.
+  const diasPausa = (f.horas_pausadas_fase + f.otras_horas_pausadas) / 8;
+  const corrido = Math.round(diasPausa);
+  const N = E != null ? sumarHabiles(E, corrido, fer) : null;
+  const entregaCorregida = N != null ? iso(N) : null;
   const etapa = f.id_req === "0" ? "sin_asignacion" : etapaDe(f.estado);
   const lider = f.team_leader ?? (lideres.has(f.usuario) ? f.usuario : "Sin líder");
   const causas: Record<Causa, number> = { pausas: 0, cliente: 0, devoluciones: 0, pausa: 0, ejecucion: 0 };
   const consumo = f.horas_presu && f.horas_presu > 0 ? f.horas_trab / f.horas_presu : null;
   const horasExcedidas = f.horas_presu != null && f.horas_trab > f.horas_presu ? f.horas_trab - f.horas_presu : 0;
-  const diasEnEstado = S != null ? Math.max(0, dias(S, C)) : null;
+  const diasEnEstado = S != null ? habilesDespues(S, C, fer) : null;
 
   const detenido = etapa === "cliente" || etapa === "devuelto" || etapa === "pausa";
   const pausaSinRegistrar = detenido && S != null
-    ? Math.max(0, Math.floor(diasHabiles(S, C) - f.total_horas_pausadas / 8)) : 0;
-  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar };
+    ? Math.max(0, Math.floor(habilesDespues(S, C, fer) - diasPausa)) : 0;
+  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida };
   if (etapa === "sin_asignacion") {
     return { ...base, situacion: "sin_asignacion", atraso: null, causaPrincipal: null, avance: null, ejecucion: null };
   }
 
   let avance: number | null = null;
   if (I != null && E != null && E >= I) {
-    const plan = dias(I, E) + 1;
-    const pausas = N != null && E != null ? Math.max(0, dias(E, N)) : 0;
-    avance = Math.max(0, dias(I, Math.min(C, S != null && etapa === "finalizado" ? S : C)) + 1 - pausas) / plan;
+    const plan = Math.max(1, habiles(I, E, fer));
+    const hasta = S != null && etapa === "finalizado" ? Math.min(S, C) : C;
+    avance = Math.max(0, habiles(I, hasta, fer) - corrido) / plan;
   }
 
   if (E == null) {
@@ -155,17 +175,16 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
 
   const finalizado = etapa === "finalizado";
   const ref = finalizado && S != null ? S : C;
-  const atraso = Math.max(0, dias(E, ref));
+  const atraso = habilesDespues(E, ref, fer);
   let resto = atraso;
 
-  // 1. Pausas registradas por el sistema (ya incluyen la detención actual).
-  const corrido = N != null ? Math.max(0, dias(E, N)) : 0;
+  // 1. Pausas registradas (ya incluyen la detención actual).
   const pausas = Math.min(resto, corrido);
   resto -= pausas;
   // La parte que corresponde a la detención actual se atribuye a su motivo.
   let actual = 0;
   if (!finalizado && S != null && (etapa === "cliente" || etapa === "devuelto" || etapa === "pausa")) {
-    actual = Math.min(pausas, diasHabiles(S, C));
+    actual = Math.min(pausas, habilesDespues(S, C, fer));
     causas[etapa === "cliente" ? "cliente" : etapa === "devuelto" ? "devoluciones" : "pausa"] += actual;
   }
   causas.pausas = pausas - actual;
@@ -188,7 +207,7 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   let situacion: Situacion;
   if (finalizado) situacion = atraso > 0 ? "fin_tarde" : "fin_a_tiempo";
   else if (atraso > 0) situacion = "atrasado";
-  else if (N != null && dias(C, N) <= 3) situacion = "vence_pronto";
+  else if (N != null && habilesDespues(C, N, fer) <= 3) situacion = "vence_pronto";
   else situacion = "en_plazo";
 
   return { ...base, situacion, atraso, causaPrincipal, avance, ejecucion };
