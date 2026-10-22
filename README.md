@@ -80,7 +80,7 @@ Están en las vistas `v_requerimientos` y `v_fases` del archivo de migración, p
 - **Equipos DITA y DPJ.** «DESARROLLO IT ALIANZA - (DITA)» y «DESARROLLO FPJ - (DPJ)» solo cuentan **testing**, salvo que el SGR tenga horas presupuestadas de desarrollo. En ese caso también cuenta la fase de desarrollo.
 - **Resto de equipos.** La fase de desarrollo existe si hay horas trabajadas o presupuestadas de desarrollo. La de testing existe si hay horas trabajadas o presupuestadas de testing. Se decide por horas y no por fechas, porque la planilla trae fechas de fin aun cuando la fase no existió.
 - **Fases independientes.** Desarrollo y testing se miden por separado, cada uno con su fecha de inicio y fin, porque no son secuenciales.
-- **Pausas.** Las horas pausadas se consideran tiempo calendario detenido: *días netos = días calendario − horas pausadas ÷ 24* (los días calendario se cuentan inclusive).
+- **Pausas.** Las horas pausadas se consideran tiempo calendario detenido: *días netos = días calendario (contados inclusive) − horas pausadas ÷ 8*. Ocho horas pausadas equivalen a un día, la misma regla que usa el sistema para correr la entrega estimada.
 - **Tiempo de entrega.** Va desde el inicio de la primera fase que aplique hasta la fecha de implementación, descontando las «Horas Pausadas» totales del SGR.
 - **Desarrollo y Testing como servicios.** Un SGR es un **desarrollo de Onnix** solo si tiene horas presupuestadas de desarrollo, en cualquier equipo. Sin presupuesto de desarrollo nunca cuenta como desarrollo entregado, aunque tenga horas o importe cargados; esas horas se informan aparte como «horas de desarrollo sin presupuesto». **Testing** es un servicio adicional que se presta sobre desarrollos de Onnix y sobre desarrollos internos del cliente. Cada SGR tiene un servicio: *Desarrollo con testing*, *Desarrollo sin testing*, *Solo testing (desarrollo del cliente)* o *Sin horas presupuestadas*.
 - **Estados.** PRO es *Finalizado en producción*, PAP es *Pase a producción* (terminado, todavía no pasado a PRO) y DST es *Desestimado por el cliente*.
@@ -111,6 +111,42 @@ Están en las vistas `v_requerimientos` y `v_fases` del archivo de migración, p
 Todos se filtran por año, servicio, equipo (incluidos los grupos «Equipos de Onnix» y «Equipos DITA y DPJ»), tipo y estado. Cada filtro admite **varios valores**: dentro de un filtro se combinan con «o» y entre filtros con «y». Con varios años, los gráficos mensuales muestran cada mes de cada año y el acumulado se reinicia al empezar cada año.
 
 Cada reporte tiene un botón **Exportar PDF**: abre el diálogo de impresión del navegador, donde se elige «Guardar como PDF». El PDF sale en A4 apaisado, en colores claros, con el título, los filtros aplicados, la fecha de generación y el archivo de datos usado; el nombre del archivo es el título del reporte.
+
+## Requerimientos en curso
+
+Se alimenta con dos planillas más, que se suben en **Cargar planillas** junto con la de facturación o por separado:
+
+- `Seguimiento_desa.csv`: los SGR que hoy están en manos de desarrollo.
+- `Seguimiento_testing.csv`: los SGR que hoy están en testing.
+
+El tipo de cada archivo se reconoce por sus encabezados y cada planilla reemplaza solo sus propios datos. Al cargar se indica la **fecha de corte**, que es el «hoy» con el que se calculan los atrasos.
+
+### Cómo se mide el atraso
+
+Se mide en días de calendario entre la **entrega estimada original** y la fecha de corte (o la fecha en que la fase se dio por finalizada), y se reparte en causas en este orden:
+
+1. **Pausas**: lo que el sistema corrió la entrega (Nueva entrega estimada − Entrega estimada; 8 horas pausadas equivalen a 1 día). Las horas pausadas ya incluyen la detención actual. Si hoy el SGR está detenido, la parte de las pausas que corresponde a esa detención (días hábiles en el estado actual) se atribuye a su motivo:
+   - **espera del cliente**: *Aguardando retorno FPJ*, *Pendiente de Pruebas UAT* o *Devuelto por Cambios en Requerimiento*;
+   - **devolución de testing**: *Devuelto al Desarrollador…*;
+   - **pausa sin motivo**: *Testing en Pausa*.
+
+   El resto queda como **pausas anteriores**.
+2. **Devoluciones de testing**: en testing, si el SGR tuvo devoluciones al desarrollador, el resto del atraso se atribuye a ellas.
+3. **Ejecución**: lo que queda. Se subdivide en *más horas que las presupuestadas* (subestimación o ineficiencia), *ritmo por debajo del plan* (menos horas que las presupuestadas pero la fecha vencida) y *no iniciado o en cola*.
+
+Los SGR en análisis o presupuesto (incluido *Presupuesto Aprobado*) **no cuentan como vencidos**: son casos en que se vuelve a analizar el alcance y cambia el presupuesto. Se muestran como «En análisis de alcance».
+
+Si un SGR detenido tiene menos horas pausadas que los días hábiles que lleva en el estado, se marca **Revisar pausa** y la lectura lo advierte, porque ese tiempo sin registrar termina contándose como ejecución.
+
+Los estados se agrupan en etapas por palabras clave (análisis y presupuesto, en cola, en trabajo, esperando al cliente, devuelto al desarrollador, en pausa, fase finalizada), así que un estado nuevo con un nombre parecido se clasifica solo. La fila con «SIN ASIGNACION» se muestra como persona sin SGR asignado.
+
+### Pantallas
+
+- **Resumen en curso** (para el CTO): indicadores, lectura automática, atraso por causa y por fase, diagnóstico del atraso por ejecución, etapas del flujo, horas usadas contra plazo transcurrido, los SGR más atrasados y la lista de SGR esperando al cliente.
+- **Desarrollo en curso** y **Testing en curso**: lo mismo por persona, y en testing el efecto de las devoluciones.
+- **Tablero del equipo**: una tarjeta por persona con sus SGR ordenados por urgencia, para la reunión de equipo.
+
+Se filtran por fase, líder, persona, tipo de servicio, etapa y situación, y se exportan a PDF como el resto.
 
 ## Estructura
 

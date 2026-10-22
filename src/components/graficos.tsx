@@ -275,3 +275,119 @@ export function BarrasH({ datos, color = "var(--desa)", formato = (v: number) =>
     </svg>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Barras horizontales apiladas (p. ej. días de atraso por causa, por fase)
+// ---------------------------------------------------------------------------
+export function BarrasApiladasH({ filas, series, formato = (v: number) => num(v), anchoEtiqueta = 120, leyenda = true }: {
+  filas: { etiqueta: string; segmentos: number[] }[];
+  series: { nombre: string; color: string }[];
+  formato?: (v: number) => string;
+  anchoEtiqueta?: number;
+  leyenda?: boolean;
+}) {
+  const W = 720, fila = 40, L = anchoEtiqueta, R = 70;
+  const total = (s: number[]) => s.reduce((a, b) => a + b, 0);
+  const max = Math.max(1, ...filas.map((f) => total(f.segmentos)));
+  const k = (W - L - R) / max;
+  return (
+    <figure style={{ margin: 0 }}>
+      <svg className="grafico" viewBox={`0 0 ${W} ${filas.length * fila}`} role="img"
+        aria-label={filas.map((f) => `${f.etiqueta}: ${f.segmentos.map((v, i) => `${series[i]?.nombre} ${formato(v)}`).join(", ")}`).join(". ")}>
+        {filas.map((f, r) => {
+          let x = L;
+          return (
+            <g key={f.etiqueta} transform={`translate(0 ${r * fila})`}>
+              <text x={L - 10} y={fila / 2 + 4} textAnchor="end" style={{ fill: "var(--tinta)", fontWeight: 600 }}>{f.etiqueta}</text>
+              {f.segmentos.map((v, i) => {
+                const w = v * k;
+                const el = (
+                  <g key={i}>
+                    <rect x={x} y={8} width={w} height={fila - 16} fill={series[i]?.color} rx={2}>
+                      <title>{`${f.etiqueta}, ${series[i]?.nombre}: ${formato(v)}`}</title>
+                    </rect>
+                    {w > 34 && <text x={x + w / 2} y={fila / 2 + 4} textAnchor="middle" style={{ fill: "#fff", fontWeight: 650 }}>{formato(v)}</text>}
+                  </g>
+                );
+                x += w;
+                return el;
+              })}
+              <text x={x + 8} y={fila / 2 + 4} style={{ fill: "var(--tinta)", fontWeight: 650 }}>{formato(total(f.segmentos))}</text>
+            </g>
+          );
+        })}
+      </svg>
+      {leyenda && (
+        <div className="leyenda">
+          {series.map((s) => <span key={s.nombre}><i style={{ background: s.color }} />{s.nombre}</span>)}
+        </div>
+      )}
+    </figure>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Consumo de horas contra avance del plazo (SGR en curso)
+// ---------------------------------------------------------------------------
+export function DispersionAvance({ puntos }: {
+  puntos: { id: string; texto: string; avance: number; consumo: number; color: string }[];
+}) {
+  const W = 560, H = 380, L = 48, R = 16, T = 14, B = 42, TOPE = 2;
+  const ancho = W - L - R, alto = H - T - B;
+  const x = (v: number) => L + (Math.min(v, TOPE) / TOPE) * ancho;
+  const y = (v: number) => T + alto - (Math.min(v, TOPE) / TOPE) * alto;
+  const marcas = [0, 0.5, 1, 1.5, 2];
+  return (
+    <figure style={{ margin: 0 }}>
+      <svg className="grafico" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Consumo de horas contra avance del plazo por SGR">
+        {marcas.map((m) => (
+          <g key={m}>
+            <line className="eje" x1={x(m)} x2={x(m)} y1={T} y2={T + alto} strokeDasharray={m === 1 ? undefined : "2 4"} />
+            <line className="eje" x1={L} x2={L + ancho} y1={y(m)} y2={y(m)} strokeDasharray={m === 1 ? undefined : "2 4"} />
+            <text x={x(m)} y={T + alto + 16} textAnchor="middle">{m === TOPE ? `≥${m * 100} %` : `${m * 100} %`}</text>
+            <text x={L - 6} y={y(m) + 4} textAnchor="end">{m === TOPE ? `≥${m * 100}` : m * 100}</text>
+          </g>
+        ))}
+        <line x1={x(0)} y1={y(0)} x2={x(TOPE)} y2={y(TOPE)} stroke="var(--tinta)" strokeWidth={1.2} />
+        {puntos.map((p) => (
+          <circle key={p.id} cx={x(p.avance)} cy={y(p.consumo)} r={5} fill={p.color} fillOpacity={0.8} stroke="var(--superficie)">
+            <title>{p.texto}</title>
+          </circle>
+        ))}
+        <text x={L + ancho / 2} y={H - 4} textAnchor="middle">Plazo transcurrido (sin pausas)</text>
+        <text transform={`translate(12 ${T + alto / 2}) rotate(-90)`} textAnchor="middle">Horas usadas del presupuesto</text>
+      </svg>
+      <div className="leyenda">
+        <span>Sobre la diagonal: consume horas más rápido que el tiempo (riesgo de exceder el presupuesto).</span>
+        <span>Debajo y a la derecha de 100 %: plazo vencido con horas disponibles (ritmo lento).</span>
+      </div>
+    </figure>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Línea de tiempo de un SGR: plan, corrimiento por pausas y atraso
+// ---------------------------------------------------------------------------
+const ms = (s: string | null) => (s ? Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) : null);
+
+export function LineaTiempo({ inicio, estimada, nueva, corte, fin }: {
+  inicio: string | null; estimada: string | null; nueva: string | null; corte: string; fin?: string | null;
+}) {
+  const W = 180, H = 16;
+  const I = ms(inicio), E = ms(estimada), N = ms(nueva) ?? E, C = ms(fin ?? null) ?? ms(corte)!;
+  if (I == null || E == null) return <span className="debil" style={{ fontSize: "0.8rem" }}>{E == null ? "Sin fecha" : "Sin inicio"}</span>;
+  const desde = Math.min(I, E, C), hasta = Math.max(E, N ?? E, C);
+  const k = (W - 2) / Math.max(hasta - desde, 1);
+  const px = (t: number) => 1 + (t - desde) * k;
+  const finPlan = E, finPausa = Math.max(E, N ?? E);
+  const titulo = `Inicio ${inicio}, entrega estimada ${estimada}${nueva && nueva !== estimada ? `, corrida por pausas a ${nueva}` : ""}`;
+  return (
+    <svg className="libro" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={titulo}>
+      <title>{titulo}</title>
+      <rect x={px(I)} y={4} width={Math.max(1, px(finPlan) - px(I))} height={8} rx={2} fill="var(--desa-suave)" stroke="var(--desa)" strokeWidth={0.8} />
+      {finPausa > finPlan && <rect x={px(finPlan)} y={4} width={px(finPausa) - px(finPlan)} height={8} fill="#8a94a8" opacity={0.55} />}
+      {C > finPausa && <rect x={px(finPausa)} y={4} width={px(C) - px(finPausa)} height={8} fill="var(--mal)" opacity={0.85} />}
+      <rect x={px(C) - 1} y={0} width={2} height={H} fill="var(--tinta)" />
+    </svg>
+  );
+}

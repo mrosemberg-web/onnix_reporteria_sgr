@@ -51,7 +51,7 @@ const aggFase = () => sql`
   percentile_cont(0.5) within group (order by dias_cal)::float8 as dias_cal_med,
   percentile_cont(0.5) within group (order by dias_netos)::float8 as dias_netos_med,
   coalesce(sum(dias_cal), 0)::float8 as dias_cal_sum,
-  coalesce(sum(least(horas_pausadas / 24.0, dias_cal)) filter (where dias_cal is not null), 0)::float8 as dias_pausa_sum,
+  coalesce(sum(least(horas_pausadas / 8.0, dias_cal)) filter (where dias_cal is not null), 0)::float8 as dias_pausa_sum,
   coalesce(sum(importe), 0)::float8 as importe`;
 
 export type AggFase = {
@@ -84,7 +84,7 @@ export async function opciones() {
     sql<{ v: string }[]>`select distinct servicio as v from v_requerimientos`,
     sql<{ archivo: string; filas: number; cargado_en: Date; nombre: string | null }[]>`
       select c.archivo, c.filas, c.cargado_en, u.nombre from cargas c left join usuarios u on u.id = c.cargado_por
-      order by c.id desc limit 1`,
+      where c.tipo = 'facturacion' order by c.id desc limit 1`,
   ]);
   return {
     anios: anios.map((r) => r.anio),

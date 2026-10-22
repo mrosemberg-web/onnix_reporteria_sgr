@@ -127,7 +127,7 @@ select { padding-right: 28px; max-width: 260px; }
 
 /* Banda de indicadores: una sola pieza dividida, no tarjetas sueltas. */
 .banda {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r); box-shadow: var(--sombra);
 }
 .indicador { padding: 16px 18px; border-left: 1px solid var(--linea); display: grid; gap: 2px; align-content: start; }
@@ -297,3 +297,26 @@ tfoot td { font-weight: 650; border-bottom: 0; border-top: 2px solid var(--linea
   .recorte { max-width: 220px; }
   a { color: inherit; text-decoration: none; }
 }
+.lista-archivos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.88rem; }
+.lista-archivos li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--linea); border-radius: var(--r-chico); background: var(--superficie); }
+
+/* Seguimiento en curso ------------------------------------------------ */
+.composicion { display: inline-flex; flex-direction: column; gap: 3px; font-size: 0.78rem; color: var(--tinta-2); }
+.composicion svg { border-radius: 2px; background: var(--superficie-2); }
+.leyenda-causas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 20px; margin: 14px 0 0; font-size: 0.82rem; }
+.leyenda-causas dt { font-weight: 600; color: var(--tinta); }
+.leyenda-causas dt i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.leyenda-causas dd { margin: 2px 0 0 16px; color: var(--tinta-2); }
+.tablero { display: grid; gap: 22px; }
+.tablero-lider > h2 { margin-bottom: 12px; }
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 14px; }
+.tarjeta { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 10px; align-content: start; break-inside: avoid; }
+td.nombre { white-space: nowrap; }
+.tarjeta-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tarjeta-cab strong { font-size: 1rem; }
+.tarjeta-cab span { font-size: 0.82rem; color: var(--tinta-2); }
+.tarjeta ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tarjeta li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; font-size: 0.85rem; padding-top: 8px; border-top: 1px solid var(--linea); }
+.tarjeta li .sgr { font-weight: 650; }
+.tarjeta li .asunto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tinta-2); }
+.tarjeta li .meta { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
