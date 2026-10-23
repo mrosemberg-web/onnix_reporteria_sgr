@@ -1,3 +1,4 @@
+import { BotonExcel } from "./BotonExcel";
 import Link from "next/link";
 import { FiltrosBar } from "./FiltrosBar";
 import { fechaHora, num } from "@/lib/formato";
@@ -18,6 +19,7 @@ export function Encabezado({ titulo, bajada, op, f }: {
         <div className="encabezado-titulo">
           <h1>{titulo}</h1>
           <BotonPdf nombreArchivo={`${titulo} - Productividad`} />
+          <BotonExcel />
         </div>
         {bajada && <p>{bajada}</p>}
         <p className="solo-impresion impresion-meta">

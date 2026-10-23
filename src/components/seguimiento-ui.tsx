@@ -1,3 +1,4 @@
+import { BotonExcel } from "./BotonExcel";
 import { BotonPdf } from "./BotonPdf";
 import { FiltrosLista } from "./FiltrosLista";
 import { LineaTiempo } from "./graficos";
@@ -30,6 +31,7 @@ export function EncabezadoSeguimiento({ titulo, bajada, f, op, cargas, mostrarFa
         <div className="encabezado-titulo">
           <h1>{titulo}</h1>
           <BotonPdf nombreArchivo={`${titulo} - En curso`} />
+          <BotonExcel />
         </div>
         {bajada && <p>{bajada}</p>}
         <p className="debil" style={{ fontSize: "0.85rem", marginTop: 4 }}>

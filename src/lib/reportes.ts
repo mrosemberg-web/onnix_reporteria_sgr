@@ -205,7 +205,8 @@ export async function fase(fz: Fase, f: Filtros) {
   return { total: total ?? AGG_VACIO, responsables, mensual, puntos, sinPresu: sinPresu ?? { sgr: 0, horas: 0 } };
 }
 
-export async function tiempos(f: Filtros) {
+/** completo: la lista de SGR con más pausa sin recortar (para exportar). */
+export async function tiempos(f: Filtros, { completo = false } = {}) {
   const [fases, tramos, porDevolucion, masPausados, [calidad], porServicio] = await Promise.all([
     sql<(AggFase & { fase: Fase })[]>`select fase, ${aggFase()} from v_fases where ${filtro(f)} group by fase`,
     sql<{ tramo: number; sgr: number }[]>`
@@ -225,7 +226,7 @@ export async function tiempos(f: Filtros) {
           lead_neto: number | null; asignado_a: string | null; asignado_testing: string | null }[]>`
       select id_req, asunto, devoluciones, horas_pausadas::float8, lead_hab, lead_neto::float8, asignado_a, asignado_testing
       from v_requerimientos where ${filtro(f)} and horas_pausadas > 0
-      order by horas_pausadas desc limit 12`,
+      order by horas_pausadas desc ${completo ? sql`` : sql`limit 12`}`,
     sql<{ dev_sin_pausa: number; pausa_sin_dev: number; horas_pausa_con_dev: number; horas_pausa_total: number }[]>`
       select count(*) filter (where devoluciones > 0 and horas_pausadas = 0) as dev_sin_pausa,
              count(*) filter (where devoluciones = 0 and horas_pausadas > 0) as pausa_sin_dev,

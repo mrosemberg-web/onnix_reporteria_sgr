@@ -281,3 +281,26 @@ export function mediana(v: number[]) {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
+
+export type GrupoPersona = { usuario: string; nombre: string; lider: string; r: ResumenGrupo; items: Analisis[]; sinAsignacion: boolean };
+
+/** Agrupa por persona, de mayor a menor atraso. */
+export function agruparPorPersona(items: Analisis[]): GrupoPersona[] {
+  return [...new Set(items.map((a) => a.usuario))].map((u) => {
+    const propios = items.filter((a) => a.usuario === u);
+    return { usuario: u, nombre: propios[0].nombre ?? u, lider: propios[0].lider, r: resumir(propios), items: propios,
+      sinAsignacion: propios.some((a) => a.etapa === "sin_asignacion") };
+  }).sort((a, b) => b.r.diasAtraso - a.r.diasAtraso || b.r.sgr - a.r.sgr);
+}
+
+/** Devoluciones de testing agrupadas: 0, 1, 2, 3 o más. */
+export function porDevolucionesTesting(items: Analisis[]) {
+  return [0, 1, 2, 3].map((g) => {
+    const l = items.filter((a) => a.etapa !== "sin_asignacion" && Math.min(a.devoluciones ?? 0, 3) === g);
+    const conHoras = l.filter((a) => a.horas_presu && a.horas_trab > 0);
+    const trab = conHoras.reduce((s, a) => s + a.horas_trab, 0), presu = conHoras.reduce((s, a) => s + (a.horas_presu ?? 0), 0);
+    return { g, n: l.length, atrasados: l.filter((a) => a.situacion === "atrasado" || a.situacion === "fin_tarde").length,
+      atraso: mediana(l.filter((a) => a.atraso != null).map((a) => a.atraso!)), consumo: presu ? trab / presu : null };
+  }).filter((x) => x.n > 0);
+}
+export const ETIQUETA_DEVOLUCIONES = ["Sin devoluciones", "1 devolución", "2 devoluciones", "3 o más"];

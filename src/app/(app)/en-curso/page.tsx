@@ -1,3 +1,4 @@
+import { TituloRegion } from "@/components/BotonExcel";
 import { BarrasApiladasH, DispersionAvance } from "@/components/graficos";
 import { EncabezadoSeguimiento, LeyendaCausas, SinSeguimiento, TablaSgr } from "@/components/seguimiento-ui";
 import { Indicador, Lectura } from "@/components/ui";
@@ -56,7 +57,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>¿Por qué se atrasan?</h2>
+          <TituloRegion region="atraso_causa">¿Por qué se atrasan?</TituloRegion>
           <p>Días hábiles de atraso de los SGR que todavía no terminaron su fase, según la causa.</p>
         </div>
         <BarrasApiladasH series={ORDEN_CAUSAS.map((c) => ({ nombre: CAUSAS[c].nombre, color: CAUSAS[c].color }))}
@@ -70,7 +71,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Dónde están hoy</h2>
+          <TituloRegion region="etapas">Dónde están hoy</TituloRegion>
           <p>SGR por etapa del flujo.</p>
         </div>
         <BarrasApiladasH anchoEtiqueta={110}
@@ -82,7 +83,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
       </section>
       <section className="panel">
         <div className="panel-cab">
-          <h2>Atraso por ejecución: ¿lentitud o subestimación?</h2>
+          <TituloRegion region="ejecucion">Atraso por ejecución: ¿lentitud o subestimación?</TituloRegion>
           <p>SGR con atraso que no explican las pausas ni las devoluciones.</p>
         </div>
         <div className="tabla-env">
@@ -106,7 +107,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
       </section>
       <section className="panel">
         <div className="panel-cab">
-          <h2>SGR en trabajo: horas usadas contra plazo transcurrido</h2>
+          <TituloRegion region="avance">SGR en trabajo: horas usadas contra plazo transcurrido</TituloRegion>
           <p>{num(activos.length)} SGR en trabajo con fecha y presupuesto. Pasá el cursor sobre un punto para ver el SGR.</p>
         </div>
         <div style={{ maxWidth: 720 }}>
@@ -121,7 +122,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Los SGR más atrasados</h2>
+          <TituloRegion region="mas_atrasados">Los SGR más atrasados</TituloRegion>
           <p>La línea muestra el plan (azul), el corrimiento por pausas (gris) y el atraso (rojo); la marca negra es la fecha de corte. Atraso en días hábiles.</p>
         </div>
         <TablaSgr items={masAtrasados} corte={corte} />
@@ -130,7 +131,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
       {cliente.length > 0 && (
         <section className="panel">
           <div className="panel-cab">
-            <h2>Esperando al cliente</h2>
+            <TituloRegion region="esperando_cliente">Esperando al cliente</TituloRegion>
             <p>Para gestionar con el cliente, del que más tiempo lleva esperando al más reciente.</p>
           </div>
           <div className="tabla-env">

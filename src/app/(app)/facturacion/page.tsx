@@ -1,3 +1,4 @@
+import { TituloRegion } from "@/components/BotonExcel";
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
 import { textoAnios, type SearchParams } from "@/lib/filtros";
@@ -41,7 +42,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
       </section>
       <Lectura parrafos={lectura} />
       <section className="panel">
-        <h2>Por período de facturación</h2>
+        <TituloRegion region="periodos">Por período de facturación</TituloRegion>
         <div className="tabla-env">
           <table>
             <thead>

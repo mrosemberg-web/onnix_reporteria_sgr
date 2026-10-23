@@ -1,3 +1,4 @@
+import { BotonExcel } from "@/components/BotonExcel";
 import { LineaTiempo } from "@/components/graficos";
 import { ChipEtapa, ChipSituacion, EncabezadoSeguimiento, SinSeguimiento } from "@/components/seguimiento-ui";
 import { requerirSesion } from "@/lib/auth";
@@ -24,6 +25,7 @@ export default async function Tablero({ searchParams }: { searchParams: Promise<
     <>
       <EncabezadoSeguimiento titulo="Tablero del equipo" op={op} f={f} cargas={cargas}
         bajada="Lo que tiene cada persona, ordenado por urgencia. Pensado para repasar en la reunión de equipo." />
+      <div className="no-imprimir"><BotonExcel region="tablero" texto="Excel del tablero" /></div>
       <div className="tablero">
         {(["desa", "test"] as const).map((fz) => {
           const deFase = items.filter((a) => a.fase === fz);

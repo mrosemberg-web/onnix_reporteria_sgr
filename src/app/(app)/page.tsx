@@ -1,3 +1,4 @@
+import { BotonExcel, TituloRegion } from "@/components/BotonExcel";
 import { BarrasAcumulado, BarrasPresuReal, Distribucion } from "@/components/graficos";
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
@@ -33,6 +34,7 @@ export default async function PaginaResumen({ searchParams }: { searchParams: Pr
           <div className="heroe-servicio">
             <p><strong>Testing como servicio adicional</strong> en {num(kpis.testing_entregados)} SGR:</p>
             <p>{num(kpis.testing_onnix)} sobre desarrollos de Onnix y {num(kpis.testing_cliente)} sobre desarrollos internos del cliente.</p>
+            <p><BotonExcel region="entregas_mes" texto="Excel de entregas por mes" /></p>
             <p className="debil">Promedio de {num(promedio, 1)} desarrollos por mes con entregas.
               {kpis.desestimados > 0 && <> Sin contar {num(kpis.desestimados)} SGR desestimados por el cliente.</>}</p>
           </div>
@@ -74,7 +76,7 @@ export default async function PaginaResumen({ searchParams }: { searchParams: Pr
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Horas presupuestadas y trabajadas por mes de implementación</h2>
+          <TituloRegion region="horas_mes">Horas presupuestadas y trabajadas por mes de implementación</TituloRegion>
           <p>Desarrollo y testing sumados. Solo cuentan horas de desarrollo con presupuesto de desarrollo.</p>
         </div>
         <BarrasPresuReal color="var(--desa)"

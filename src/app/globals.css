@@ -320,3 +320,9 @@ td.nombre { white-space: nowrap; }
 .tarjeta li .sgr { font-weight: 650; }
 .tarjeta li .asunto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tinta-2); }
 .tarjeta li .meta { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Exportación a Excel ------------------------------------------------ */
+.titulo-region { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel > .titulo-region + * { margin-top: 14px; }
+.boton-excel { min-height: 26px !important; padding: 3px 9px !important; font-size: 0.78rem !important; gap: 5px !important; }
+.encabezado-titulo .boton { white-space: nowrap; }

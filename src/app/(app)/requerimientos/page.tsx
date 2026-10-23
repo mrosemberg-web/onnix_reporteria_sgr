@@ -1,3 +1,4 @@
+import { TituloRegion } from "@/components/BotonExcel";
 import { TablaRequerimientos } from "@/components/TablaRequerimientos";
 import { Encabezado, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
@@ -17,7 +18,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
         bajada="Detalle por SGR con las reglas aplicadas. El color de las horas indica si la fase quedó dentro del presupuesto." />
       <section className="panel">
         <div className="panel-cab" style={{ marginBottom: 12 }}>
-          <h2>Detalle de SGR</h2>
+          <TituloRegion region="detalle">Detalle de SGR</TituloRegion>
           <a className="boton sec no-imprimir" href={`/api/exportar?${aQuery(f)}`}>Descargar CSV</a>
         </div>
         <TablaRequerimientos filas={filas} />

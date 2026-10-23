@@ -1,3 +1,4 @@
+import { TituloRegion } from "@/components/BotonExcel";
 import Link from "next/link";
 import { BarraLibro } from "@/components/graficos";
 import { Encabezado, EtiquetaIndice, SinDatos } from "@/components/ui";
@@ -41,7 +42,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
         ))}
       </nav>
       <section className="panel">
-        <h2>{dim.texto}</h2>
+        <TituloRegion region={`desglose_${dim.clave}`}>{dim.texto}</TituloRegion>
         <div className="tabla-env">
           <table>
             <thead>

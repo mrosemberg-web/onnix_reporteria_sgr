@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "4mb" },
   },
   poweredByHeader: false,
+  // exceljs se usa solo en el servidor (exportación a Excel).
+  serverExternalPackages: ["exceljs"],
   async headers() {
     return [
       {

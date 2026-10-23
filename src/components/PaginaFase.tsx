@@ -1,3 +1,4 @@
+import { BotonExcel, TituloRegion } from "./BotonExcel";
 import { BarraLibro, BarrasAcumulado, BarrasPresuReal, Dispersion, Distribucion } from "./graficos";
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "./ui";
 import { contextoReporte } from "@/lib/contexto";
@@ -73,7 +74,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Productividad por {t.persona.toLowerCase()}</h2>
+          <TituloRegion region="por_persona">Productividad por {t.persona.toLowerCase()}</TituloRegion>
           <p>La barra muestra horas trabajadas; la marca vertical, las presupuestadas. En rojo, el excedente.</p>
         </div>
         <div className="tabla-env">
@@ -155,7 +156,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
       <div className="rejilla-2">
         <section className="panel">
           <div className="panel-cab">
-            <h2>SGR con {t.titulo.toLowerCase()} terminado, por mes</h2>
+            <TituloRegion region="por_mes">SGR con {t.titulo.toLowerCase()} terminado, por mes</TituloRegion>
             <p>Según la fecha de fin de {fz === "desa" ? "desarrollo" : "testing"}.{mensual.some((m) => m.previo) && " «Previo» agrupa los que terminaron antes del período elegido."}</p>
           </div>
           <BarrasAcumulado datos={entregas} series={seriesEntregas} />
@@ -166,7 +167,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
             <p>Cuántos SGR quedaron dentro de lo presupuestado.</p>
           </div>
           <Distribucion dentro={total.dentro} leve={total.leve} sobre={total.sobre} sinRegistro={total.sin_registro} />
-          <h3 style={{ marginTop: 24 }}>Horas por mes de fin de fase</h3>
+          <div className="titulo-region" style={{ marginTop: 24 }}><h3>Horas por mes de fin de fase</h3><BotonExcel region="horas_mes" /></div>
           <BarrasPresuReal color={t.color}
             datos={mensual.map((m) => ({ etiqueta: m.etiqueta, presu: m.horas_presu, real: m.horas_real }))} />
         </section>
@@ -174,7 +175,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Precisión de la estimación por SGR</h2>
+          <TituloRegion region="precision">Precisión de la estimación por SGR</TituloRegion>
           <p>{num(puntos.length)} SGR. Pasá el cursor por un punto para ver el detalle.</p>
         </div>
         <div style={{ maxWidth: 720 }}>

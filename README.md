@@ -34,6 +34,21 @@ Ingresá con el administrador, andá a **Cargar planilla** y subí el CSV.
 
 Seguridad de la base: las tablas tienen RLS habilitado **sin políticas**. La app entra con el rol `postgres` por la cadena de conexión, mientras que la API REST pública de Supabase (anon key) no puede leer nada. Las vistas usan `security_invoker`.
 
+## Exportación a Excel
+
+Todas las tablas y gráficos de las pantallas de Implementados y En curso se pueden bajar a Excel, con los mismos filtros que se ven en pantalla:
+
+- **Botón «Excel» en cada región**: descarga esa tabla o los datos de ese gráfico.
+- **«Exportar todo a Excel»**, junto a «Exportar PDF»: un solo archivo con una hoja por región de la pantalla. En «Por área y tipo» incluye una hoja por cada agrupación.
+
+Cada archivo empieza con una hoja **Filtros**: reporte, filtros aplicados, datos o fecha de corte, criterio de días hábiles, usuario y fecha de generación. En las hojas de datos:
+
+- los números, importes, porcentajes y fechas tienen formato de Excel;
+- la primera fila queda fija y tiene filtros;
+- las listas que en pantalla muestran solo los 12 primeros se exportan completas.
+
+Los archivos se generan en el servidor (`/api/excel`) con exceljs y requieren sesión. Las pantallas de Administración no se exportan.
+
 ## Diagnóstico
 
 Abrí `https://<tu-app>/api/salud` (no requiere sesión). Devuelve un JSON que indica:

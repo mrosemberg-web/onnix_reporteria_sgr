@@ -1,3 +1,4 @@
+import { TituloRegion } from "./BotonExcel";
 import { BarrasApiladasH } from "./graficos";
 import { EncabezadoSeguimiento, LeyendaCausas, SinSeguimiento, TablaSgr } from "./seguimiento-ui";
 import { Indicador, Lectura } from "./ui";
@@ -6,7 +7,9 @@ import type { SearchParams } from "@/lib/filtros";
 import { dias, horas, num, pct } from "@/lib/formato";
 import { lecturaSeguimiento } from "@/lib/lectura-seguimiento";
 import { aplicarFiltros, cargarSeguimiento, leerFiltrosSeguimiento, opcionesSeguimiento } from "@/lib/seguimiento";
-import { CAUSAS, mediana, ORDEN_CAUSAS, resumir, type Analisis } from "@/lib/seguimiento-calculo";
+import {
+  agruparPorPersona, CAUSAS, ETIQUETA_DEVOLUCIONES, ORDEN_CAUSAS, porDevolucionesTesting, resumir, type Analisis,
+} from "@/lib/seguimiento-calculo";
 
 const TEXTO = {
   desa: { titulo: "Desarrollo en curso", persona: "Desarrollador", color: "var(--desa)",
@@ -29,10 +32,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
   const sgr = items.filter((a) => a.etapa !== "sin_asignacion");
   const r = resumir(items);
 
-  const personas = [...new Set(items.map((a) => a.usuario))].map((u) => {
-    const propios = items.filter((a) => a.usuario === u);
-    return { usuario: u, nombre: propios[0].nombre ?? u, lider: propios[0].lider, r: resumir(propios), items: propios };
-  }).sort((a, b) => b.r.diasAtraso - a.r.diasAtraso || b.r.sgr - a.r.sgr);
+  const personas = agruparPorPersona(items);
   const conAtraso = personas.filter((p) => p.r.diasAtraso > 0);
 
   const ordenados = [...sgr].sort((a, b) =>
@@ -59,7 +59,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
       {conAtraso.length > 0 && (
         <section className="panel">
           <div className="panel-cab">
-            <h2>Días de atraso por {t.persona.toLowerCase()} y causa</h2>
+            <TituloRegion region="atraso_persona">Días de atraso por {t.persona.toLowerCase()} y causa</TituloRegion>
             <p>Lo que está en rojo es atraso que no explican las pausas, el cliente ni las devoluciones.</p>
           </div>
           <BarrasApiladasH anchoEtiqueta={170}
@@ -71,7 +71,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
       )}
 
       <section className="panel">
-        <h2>Por {t.persona.toLowerCase()}</h2>
+        <TituloRegion region="por_persona">Por {t.persona.toLowerCase()}</TituloRegion>
         <div className="tabla-env">
           <table>
             <thead>
@@ -114,7 +114,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Detalle de SGR</h2>
+          <TituloRegion region="detalle">Detalle de SGR</TituloRegion>
           <p>Primero los atrasados, del mayor al menor atraso.</p>
         </div>
         <TablaSgr items={ordenados} corte={corte} />
@@ -124,18 +124,12 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
 }
 
 function DevolucionesTesting({ items }: { items: Analisis[] }) {
-  const grupos = [0, 1, 2, 3].map((g) => {
-    const l = items.filter((a) => Math.min(a.devoluciones ?? 0, 3) === g);
-    const conHoras = l.filter((a) => a.horas_presu && a.horas_trab > 0);
-    const trab = conHoras.reduce((s, a) => s + a.horas_trab, 0), presu = conHoras.reduce((s, a) => s + (a.horas_presu ?? 0), 0);
-    return { g, n: l.length, atrasados: l.filter((a) => a.situacion === "atrasado" || a.situacion === "fin_tarde").length,
-      atraso: mediana(l.filter((a) => a.atraso != null).map((a) => a.atraso!)), consumo: presu ? trab / presu : null };
-  }).filter((x) => x.n > 0);
-  const etiqueta = ["Sin devoluciones", "1 devolución", "2 devoluciones", "3 o más"];
+  const grupos = porDevolucionesTesting(items);
+  const etiqueta = ETIQUETA_DEVOLUCIONES;
   return (
     <section className="panel">
       <div className="panel-cab">
-        <h2>Devoluciones al desarrollador</h2>
+        <TituloRegion region="devoluciones">Devoluciones al desarrollador</TituloRegion>
         <p>Cada devolución obliga a volver a probar: suma horas de testing y corre la fecha.</p>
       </div>
       <div className="tabla-env">

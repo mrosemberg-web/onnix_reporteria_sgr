@@ -1,3 +1,4 @@
+import { BotonExcel, TituloRegion } from "@/components/BotonExcel";
 import { BarrasH } from "@/components/graficos";
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
@@ -60,7 +61,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
       <div className="rejilla-2">
         <section className="panel">
-          <h2>Duración por fase</h2>
+          <TituloRegion region="duracion_fase">Duración por fase</TituloRegion>
           <div className="tabla-env">
             <table>
               <thead><tr><th /><th className="n">Desarrollo</th><th className="n">Testing</th></tr></thead>
@@ -76,7 +77,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
         </section>
         <section className="panel">
           <div className="panel-cab">
-            <h2>Tiempo total de entrega</h2>
+            <TituloRegion region="tramos">Tiempo total de entrega</TituloRegion>
             <p>Inicio de la primera fase hasta la implementación, sin pausas.</p>
           </div>
           <BarrasH datos={tramos.map((t) => ({ etiqueta: TRAMOS[t.tramo - 1], valor: t.sgr }))} />
@@ -85,7 +86,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Tiempo de entrega por servicio</h2>
+          <TituloRegion region="por_servicio">Tiempo de entrega por servicio</TituloRegion>
           <p>Desde el inicio de la primera fase hasta la implementación. En «Solo testing» mide únicamente el servicio de testing.</p>
         </div>
         <div className="tabla-env">
@@ -111,7 +112,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>Impacto de las devoluciones al cliente</h2>
+          <TituloRegion region="por_devoluciones">Impacto de las devoluciones al cliente</TituloRegion>
           <p>Mientras el cliente completa datos o responde consultas, el SGR queda detenido y la fecha de entrega se corre. Solo SGR entregados.</p>
         </div>
         <div className="tabla-env">
@@ -140,7 +141,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
 
       <section className="panel">
         <div className="panel-cab">
-          <h2>SGR con más tiempo en pausa</h2>
+          <TituloRegion region="mas_pausados">SGR con más tiempo en pausa</TituloRegion>
           <p>Los que más corren la fecha de entrega sin consumir horas de trabajo. La entrega de un desestimado no se calcula.</p>
         </div>
         <div className="tabla-env">
