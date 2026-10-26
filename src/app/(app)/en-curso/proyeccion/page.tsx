@@ -122,7 +122,8 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
           Cada SGR entra completo en un solo mes y su importe de desarrollo va al equipo de desarrollo y el de testing al de testing.
           Para los SGR que siguen en desarrollo y necesitan testing, el fin de testing se estima sumando a su entrega de desarrollo los días
           hábiles de testing que surgen del importe (÷ Gs. {num(TARIFA_TEST_HORA)} por hora ÷ 8 horas). Ya entregado en el mes en curso: implementados
-          y SGR en «Testing Finalizado» o «Desarrollo Finalizado» cuya fecha que manda cayó en el mes, hasta la fecha de corte ({fecha(p.corte)}).
+          (incluidos los desestimados por el cliente, con el importe de la planilla, que ya refleja el descuento acordado) y SGR en
+          «Testing Finalizado» o «Desarrollo Finalizado» cuya fecha que manda cayó en el mes, hasta la fecha de corte ({fecha(p.corte)}).
         </p>
       </section>
 
@@ -155,7 +156,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
               {ordenados.map((i) => (
                 <tr key={`${i.origen}-${i.id_req}`}>
                   <td className="nombre"><DestinoChip i={i} actual={actual} /></td>
-                  <td>{i.id_req}</td>
+                  <td className="nombre">{i.id_req}{i.desestimado && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }}>Desestimado</span>}</td>
                   <td className="recorte" title={i.asunto ?? ""}>{i.asunto}</td>
                   <td>{ESCENARIOS[i.escenario]}</td>
                   <td className="recorte" style={{ maxWidth: 220 }} title={i.situacion}>{i.situacion}</td>
@@ -167,7 +168,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
                   </td>
                   <td className="n">{i.desa ? gs(i.desa) : "–"}</td>
                   <td className="n">{i.test ? gs(i.test) : "–"}</td>
-                  <td className="n">{gs(i.desa + i.test)}</td>
+                  <td className="n">{gs(i.desa + i.test)}{i.descuento ? <span className="debil" title="Presupuesto por tarifa menos importe de la planilla"> (desc. {gs(i.descuento)})</span> : null}</td>
                 </tr>
               ))}
             </tbody>

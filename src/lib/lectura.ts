@@ -11,7 +11,7 @@ export function lecturaFase(fz: Fase, t: AggFase, resp: FilaResponsable[]): stri
   const idx = indice(t);
 
   if (idx !== null) {
-    const desest = t.desestimados ? ` (${num(t.desestimados)} de ellos luego desestimados por el cliente)` : "";
+    const desest = t.desestimados ? ` (${num(t.desestimados)} de ellos desestimados por el cliente, que cuentan como entregados)` : "";
     const cliente = fz === "test" && t.solo_test ? `, ${num(t.solo_test)} de ellos sobre desarrollos internos del cliente` : "";
     const base = `Se cerraron ${num(t.sgr)} SGR de ${NOMBRE[fz]}${cliente}${desest}. En los ${num(conHoras)} con horas cargadas se trabajaron ${horas(t.real_reg)} contra ${horas(t.presu_reg)} presupuestadas (índice de cumplimiento ${num(idx, 2)}).`;
     if (idx >= 1) {
@@ -65,7 +65,7 @@ export function lecturaResumen(k: KpisReq, desa: AggFase, test: AggFase): string
   );
   if (k.sgr_pap) out.push(`${num(k.sgr_pap)} SGR están en pase a producción, todavía sin pasar al estado final.`);
   if (k.desestimados) {
-    out.push(`${num(k.desestimados)} SGR fueron desestimados por el cliente después de iniciados: consumieron ${horas(k.horas_desestimados)} de trabajo y ${gsCorto(k.facturado_desestimados)} facturables, aunque no llegaron a producción.`);
+    out.push(`${num(k.desestimados)} de los entregados fueron desestimados por el cliente: consumieron ${horas(k.horas_desestimados)} de trabajo y suman ${gsCorto(k.facturado_desestimados)} facturables${k.descuento_desestimados ? `, con ${gsCorto(k.descuento_desestimados)} de descuento respecto de presupuesto por tarifa` : ""}. Cuentan como entregados aunque no pasaron a producción.`);
   }
   out.push(...lecturaFase("desa", desa, []).slice(0, 1), ...lecturaFase("test", test, []).slice(0, 1));
   if (k.sgr_con_devolucion) {

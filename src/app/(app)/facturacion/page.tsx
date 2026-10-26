@@ -38,7 +38,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
         <Indicador nombre="Sin fecha de facturación" valor={gsCorto(pendientes?.total ?? 0)} nota={`${num(pendientes?.sgr ?? 0)} SGR`} />
         <Indicador nombre="Horas trabajadas no facturadas" valor={horas(exced)} nota="excedente sobre lo presupuestado" />
         <Indicador nombre="Horas presupuestadas no usadas" valor={horas(ahorr)} nota="SGR terminados por debajo" />
-        <Indicador nombre="De SGR desestimados" valor={gsCorto(factDesest)} nota={`${num(nDesest)} SGR que el cliente desestimó con trabajo ya hecho`} />
+        <Indicador nombre="De SGR desestimados" valor={gsCorto(factDesest)} nota={`${num(nDesest)} SGR, incluidos en el total; el importe ya refleja el descuento acordado`} />
       </section>
       <Lectura parrafos={lectura} />
       <section className="panel">

@@ -56,7 +56,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
               {filas.map((r) => (
                 <tr key={r.clave}>
                   <td>{dim.clave === "servicio" ? nombreServicio(r.clave) : r.clave}</td>
-                  <td className="n">{r.desarrollos ? num(r.desarrollos) : ""}{r.desestimados > 0 && <span className="debil" title="Desestimados por el cliente"> +{r.desestimados} desest.</span>}</td>
+                  <td className="n">{r.desarrollos ? num(r.desarrollos) : ""}{r.desestimados > 0 && <span className="debil" title="Desestimados por el cliente, incluidos"> ({r.desestimados} desest.)</span>}</td>
                   <td className="n">{r.solo_test ? num(r.solo_test) : ""}</td>
                   <td className="n">{horas(r.horas_real)}</td>
                   <td className="n">{horas(r.horas_presu)}</td>

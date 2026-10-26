@@ -2,7 +2,7 @@
 export const ESTADOS: Record<string, { nombre: string; clase: string; entregado: boolean }> = {
   PRO: { nombre: "Finalizado en producción", clase: "e-bien", entregado: true },
   PAP: { nombre: "Pase a producción", clase: "e-desa", entregado: true },
-  DST: { nombre: "Desestimado por el cliente", clase: "e-neutro", entregado: false },
+  DST: { nombre: "Desestimado por el cliente", clase: "e-neutro", entregado: true },
 };
 
 export function nombreEstado(codigo: string | null | undefined) {

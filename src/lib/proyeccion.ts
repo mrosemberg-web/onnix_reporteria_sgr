@@ -13,8 +13,8 @@ import { sql } from "./db";
 import { aplicarFiltros, cargarSeguimiento, type FiltrosSeguimiento } from "./seguimiento";
 import { aIso, fechaMs, sumarHabiles, type Analisis } from "./seguimiento-calculo";
 
-/** Tarifa de testing por hora (Gs.), la del histórico de facturación. */
-export const TARIFA_TEST_HORA = 200_000;
+import { TARIFA_DESA_HORA, TARIFA_TEST_HORA } from "./reportes";
+export { TARIFA_TEST_HORA };
 
 export type Escenario = 1 | 2 | 3;
 export const ESCENARIOS: Record<Escenario, string> = {
@@ -42,6 +42,10 @@ export type ItemProyeccion = {
   mes: string | null;           // 'AAAA-MM' o 'siguiente'
   desa: number;
   test: number;
+  /** Desestimado por el cliente (cuenta como entregado). */
+  desestimado: boolean;
+  /** Presupuesto × tarifa menos el importe de la planilla, si es positivo. */
+  descuento: number | null;
 };
 
 const escenarioDe = (desa: number, test: number): Escenario | null =>
@@ -62,6 +66,7 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
     id_req: a.id_req, asunto: a.asunto, escenario: esc, origen: "en_curso" as const,
     situacion: `${a.fase === "desa" ? "Desarrollo" : "Testing"}: ${a.estado ?? ""}`, responsable: a.nombre ?? a.usuario,
     usuarios: [a.usuario], lider: a.lider, tipo: a.tipo_servicio, base: base as ItemProyeccion["base"], desa, test,
+    desestimado: false, descuento: null,
   };
   const finalizado = a.etapa === "finalizado";
   const mesCorte = corte.slice(0, 7);
@@ -93,6 +98,7 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
 type FilaHistorica = {
   id_req: string; asunto: string | null; servicio: string; estado: string | null; asignado_a: string | null;
   asignado_testing: string | null; tipo_requerimiento: string | null; desa: number; test: number; fecha_fin: string;
+  desestimado: boolean; descuento: number;
 };
 
 export type Proyeccion = Awaited<ReturnType<typeof proyeccion>>;
@@ -112,7 +118,10 @@ export async function proyeccion(f: FiltrosSeguimiento) {
     select id_req, asunto, servicio, estado, asignado_a, asignado_testing, tipo_requerimiento,
            (case when aplica_desa then importe_desa else 0 end)::float8 as desa,
            (case when aplica_test then importe_test else 0 end)::float8 as test,
-           case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end as fecha_fin
+           case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end as fecha_fin,
+           desestimado,
+           greatest((case when aplica_desa then horas_presu_desa * ${TARIFA_DESA_HORA} - importe_desa else 0 end)
+                  + (case when aplica_test then horas_presu_test * ${TARIFA_TEST_HORA} - importe_test else 0 end), 0)::float8 as descuento
     from v_requerimientos
     where entregado and servicio in ('desa_test', 'solo_desa', 'solo_test')
       and (case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end) between ${inicioMes} and ${corte}`;
@@ -124,7 +133,9 @@ export async function proyeccion(f: FiltrosSeguimiento) {
       const esc: Escenario = h.servicio === "desa_test" ? 1 : h.servicio === "solo_desa" ? 2 : 3;
       const usuarios = [h.asignado_a, h.asignado_testing].filter((x): x is string => !!x);
       return {
-        id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const, situacion: "Implementado",
+        id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const,
+        situacion: h.desestimado ? "Desestimado por el cliente (cuenta como entregado)" : "Implementado",
+        desestimado: h.desestimado, descuento: h.desestimado && h.descuento > 0 ? h.descuento : null,
         responsable: usuarios.join(" / "), usuarios, lider: usuarios.map((u) => lideres.get(u)).find(Boolean) ?? null,
         tipo: h.tipo_requerimiento, fecha: h.fecha_fin, base: esc === 2 ? "fin_desarrollo" as const : "fin_testing" as const,
         estimada: false, destino: "entregado" as const, mes: corte.slice(0, 7), desa: h.desa, test: h.test,

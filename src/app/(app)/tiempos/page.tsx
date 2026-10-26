@@ -24,7 +24,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   const rapidos = tramos.filter((t) => t.tramo <= 3).reduce((s, t) => s + t.sgr, 0);
 
   const lectura: string[] = [];
-  if (totalTramos) lectura.push(`${pct(rapidos / totalTramos)} de los SGR entregados llegaron a producción en 30 días hábiles netos o menos, contados desde el inicio de la primera fase hasta la implementación y descontando pausas. Los desestimados no entran en este cálculo.`);
+  if (totalTramos) lectura.push(`${pct(rapidos / totalTramos)} de los SGR entregados llegaron a producción en 30 días hábiles netos o menos, contados desde el inicio de la primera fase hasta la implementación y descontando pausas.`);
   const pd = pctPausa(desa), pt = pctPausa(test);
   if (pd !== null || pt !== null) lectura.push(`Las pausas ocupan el ${pct(pd)} del tiempo hábil de desarrollo y el ${pct(pt)} del de testing. Es tiempo en que el SGR estuvo detenido, no tiempo de trabajo. El ${pct(calidad && calidad.horas_pausa_total ? calidad.horas_pausa_con_dev / calidad.horas_pausa_total : null)} de esas horas corresponde a SGR devueltos al cliente.`);
   if (sinDev?.lead_neto_med != null && conDev.length) {
@@ -142,7 +142,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
       <section className="panel">
         <div className="panel-cab">
           <TituloRegion region="mas_pausados">SGR con más tiempo en pausa</TituloRegion>
-          <p>Los que más corren la fecha de entrega sin consumir horas de trabajo. La entrega de un desestimado no se calcula.</p>
+          <p>Los que más corren la fecha de entrega sin consumir horas de trabajo.</p>
         </div>
         <div className="tabla-env">
           <table>

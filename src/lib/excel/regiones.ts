@@ -45,7 +45,7 @@ function paginaResumen(f: Filtros): DefRegion[] {
       columnas: cols(["mes", "Mes", "texto"], ["anio", "Año", "entero"], ["desarrollos", "Desarrollos entregados", "entero"],
         ["solo_test", "Solo testing (desarrollo del cliente)", "entero"], ["acumulado", "Desarrollos acumulados del año", "entero"]),
       filas: (await datos()).mensual.map((m) => ({ mes: m.etiqueta, anio: m.anio, desarrollos: m.desarrollos, solo_test: m.solo_test, acumulado: m.acumulado_desa })),
-      nota: "Por mes de implementación. No incluye SGR desestimados por el cliente.",
+      nota: "Por mes de implementación. Incluye los SGR desestimados por el cliente, que cuentan como entregados.",
     }) },
     { id: "horas_mes", titulo: "Horas por mes", construir: async () => una({
       id: "horas_mes", titulo: "Horas por mes",
@@ -493,12 +493,14 @@ function paginaProyeccion(f: FiltrosSeguimiento): DefRegion[] {
         columnas: cols(["destino", "Mes asignado", "texto"], ["sgr", "SGR", "texto"], ["asunto", "Asunto", "texto"], ["escenario", "Escenario", "texto"],
           ["situacion", "Situación", "texto"], ["responsable", "Responsable", "texto"], ["lider", "Líder", "texto"], ["tipo", "Tipo de servicio", "texto"],
           ["fecha", "Fecha que manda", "fecha"], ["base", "Fecha de", "texto"], ["estimada", "Fecha estimada", "texto"],
-          ["desa", "Desarrollo (Gs.)", "gs"], ["test", "Testing (Gs.)", "gs"], ["total", "Total (Gs.)", "gs"], ["origen", "Origen", "texto"]),
+          ["desa", "Desarrollo (Gs.)", "gs"], ["test", "Testing (Gs.)", "gs"], ["total", "Total (Gs.)", "gs"], ["origen", "Origen", "texto"],
+          ["desestimado", "Desestimado", "texto"], ["descuento", "Descuento (Gs.)", "gs"]),
         filas: [...p.items].sort((a, b) => orden[a.destino] - orden[b.destino] || String(a.mes ?? "").localeCompare(String(b.mes ?? ""))).map((i) => ({
           destino: destino(i), sgr: i.id_req, asunto: i.asunto, escenario: ESCENARIOS[i.escenario], situacion: i.situacion, responsable: i.responsable,
           lider: i.lider, tipo: i.tipo, fecha: i.fecha, base: i.base === "fin_testing" ? "Fin de testing" : "Fin de desarrollo",
           estimada: i.estimada ? "Sí" : "No", desa: i.desa, test: i.test, total: i.desa + i.test,
           origen: i.origen === "implementado" ? "Implementado" : "En curso",
+          desestimado: i.desestimado ? "Sí" : "No", descuento: i.descuento,
         })),
       });
     } },

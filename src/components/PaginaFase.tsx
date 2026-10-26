@@ -54,7 +54,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
         <Indicador nombre="SGR entregados" valor={num(total.entregados)}
           nota={[
             esTest ? `${num(total.entregados - total.solo_test_entregados)} de Onnix, ${num(total.solo_test_entregados)} del cliente` : "",
-            total.desestimados ? `+${total.desestimados} desestimados` : "",
+            total.desestimados ? `incluye ${total.desestimados} desestimados` : "",
             total.sin_registro ? `${total.sin_registro} sin horas cargadas` : "",
           ].filter(Boolean).join("; ") || undefined} />
         <Indicador nombre="Horas trabajadas" valor={horas(total.real_reg)} nota={`de ${horas(total.presu_reg)} presupuestadas`} />
@@ -105,7 +105,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
                     <td>{r.responsable}</td>
                     <td className="n">
                       {num(r.entregados)}
-                      {r.desestimados > 0 && <span className="debil" title="Desestimados por el cliente"> +{r.desestimados} desest.</span>}
+                      {r.desestimados > 0 && <span className="debil" title="Desestimados por el cliente, incluidos"> ({r.desestimados} desest.)</span>}
                       {r.sin_registro > 0 && <span className="debil" title="SGR sin horas cargadas"> ({r.sin_registro} s/h)</span>}
                     </td>
                     {esTest && <td className="n">{r.solo_test ? num(r.solo_test) : ""}</td>}
@@ -129,7 +129,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
             <tfoot>
               <tr>
                 <td>Total</td>
-                <td className="n">{num(total.entregados)}{total.desestimados > 0 && <span className="debil"> +{total.desestimados}</span>}</td>
+                <td className="n">{num(total.entregados)}{total.desestimados > 0 && <span className="debil"> ({total.desestimados} desest.)</span>}</td>
                 {esTest && <td className="n">{num(total.solo_test)}</td>}
                 <td className="n">{horas(total.horas_real)}</td>
                 <td className="n">{horas(total.horas_presu)}</td>
@@ -148,7 +148,7 @@ export async function PaginaFase({ fz, searchParams }: { fz: Fase; searchParams:
         </div>
         <p className="debil" style={{ marginTop: 12, fontSize: "0.82rem" }}>
           Desvío e índice se calculan solo sobre SGR con horas cargadas. «SGR por mes» divide los SGR por la cantidad de meses en que la persona cerró al menos uno.
-          Días netos: mediana de duración de la fase descontando horas pausadas. Los desestimados se muestran aparte de los entregados, pero sus horas sí cuentan porque el trabajo se realizó.
+          Días netos: mediana de duración de la fase descontando horas pausadas. Los desestimados por el cliente cuentan como entregados; entre paréntesis se indica cuántos son.
           Las devoluciones son al cliente (falta de datos o consultas) y no reflejan la calidad del trabajo del equipo.
         </p>
       </section>

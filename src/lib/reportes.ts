@@ -6,6 +6,10 @@ import { claveDestino, construirMeses, type Mes } from "./meses";
 
 export type Fase = "desa" | "test";
 
+/** Tarifas por hora de la planilla (Gs.), para estimar descuentos de los desestimados. */
+export const TARIFA_DESA_HORA = 240_000;
+export const TARIFA_TEST_HORA = 200_000;
+
 /** Tolerancia para considerar un desvío "leve" (10 % sobre lo presupuestado). */
 export const TOLERANCIA = 0.1;
 
@@ -100,7 +104,7 @@ export type KpisReq = {
   sgr: number; entregados: number; sgr_pap: number; desestimados: number;
   desarrollos_entregados: number; testing_entregados: number; testing_onnix: number; testing_cliente: number;
   desa_sin_presu: number; horas_desa_sin_presu: number;
-  horas_desestimados: number; facturado_desestimados: number; devoluciones_sin_pausa: number;
+  horas_desestimados: number; facturado_desestimados: number; descuento_desestimados: number; devoluciones_sin_pausa: number;
   facturado: number; facturado_desa: number; facturado_test: number; facturado_test_cliente: number;
   pendiente_facturar: number; sgr_pendiente_facturar: number; devoluciones: number; sgr_con_devolucion: number;
   lead_hab_med: number | null; lead_neto_med: number | null; horas_pausadas: number;
@@ -127,6 +131,10 @@ export async function resumen(f: Filtros) {
              coalesce(sum(horas_desa) filter (where desa_sin_presu), 0)::float8 as horas_desa_sin_presu,
              coalesce(sum(horas_real_total) filter (where desestimado), 0)::float8 as horas_desestimados,
              coalesce(sum(total_facturar) filter (where desestimado), 0)::float8 as facturado_desestimados,
+             -- Descuento: presupuesto × tarifa menos el importe de la planilla.
+             coalesce(sum(greatest(
+               (case when aplica_desa then horas_presu_desa * ${TARIFA_DESA_HORA} - importe_desa else 0 end)
+             + (case when aplica_test then horas_presu_test * ${TARIFA_TEST_HORA} - importe_test else 0 end), 0)) filter (where desestimado), 0)::float8 as descuento_desestimados,
              count(*) filter (where devoluciones > 0 and horas_pausadas = 0) as devoluciones_sin_pausa,
              coalesce(sum(total_facturar), 0)::float8 as facturado,
              coalesce(sum(importe_desa) filter (where aplica_desa), 0)::float8 as facturado_desa,

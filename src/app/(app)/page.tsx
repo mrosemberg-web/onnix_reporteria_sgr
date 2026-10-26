@@ -36,7 +36,7 @@ export default async function PaginaResumen({ searchParams }: { searchParams: Pr
             <p>{num(kpis.testing_onnix)} sobre desarrollos de Onnix y {num(kpis.testing_cliente)} sobre desarrollos internos del cliente.</p>
             <p><BotonExcel region="entregas_mes" texto="Excel de entregas por mes" /></p>
             <p className="debil">Promedio de {num(promedio, 1)} desarrollos por mes con entregas.
-              {kpis.desestimados > 0 && <> Sin contar {num(kpis.desestimados)} SGR desestimados por el cliente.</>}</p>
+              {kpis.desestimados > 0 && <> Incluye {num(kpis.desestimados)} SGR desestimados por el cliente.</>}</p>
           </div>
         </div>
         <BarrasAcumulado
@@ -56,7 +56,7 @@ export default async function PaginaResumen({ searchParams }: { searchParams: Pr
         <Indicador nombre="Devueltos al cliente" valor={pct(kpis.sgr ? kpis.sgr_con_devolucion / kpis.sgr : 0)}
           nota={`${num(kpis.sgr_con_devolucion)} SGR por falta de datos o consultas`} />
         <Indicador nombre="Desestimados por el cliente" valor={num(kpis.desestimados)}
-          nota={kpis.desestimados ? `${horas(kpis.horas_desestimados)} consumidas` : "ninguno"} />
+          nota={kpis.desestimados ? `incluidos en los entregados; ${gsCorto(kpis.facturado_desestimados)} facturables${kpis.descuento_desestimados ? `, ${gsCorto(kpis.descuento_desestimados)} de descuento` : ""}` : "ninguno"} />
         <Indicador nombre="Facturado" valor={gsCorto(kpis.facturado)}
           nota={`${gsCorto(kpis.facturado_desa)} desarrollo; ${gsCorto(kpis.facturado_test)} testing`} />
       </section>
