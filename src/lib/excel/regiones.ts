@@ -3,7 +3,7 @@ import "server-only";
 // consultas y reglas que la pantalla, respetando los filtros de la URL.
 import { nombreEstado } from "../estados";
 import { describirFiltros, leerFiltros, textoAnios, type Filtros, type SearchParams } from "../filtros";
-import { fecha, fechaHora } from "../formato";
+import { fecha, fechaHora, MESES } from "../formato";
 import {
   desglose, detalle, facturacion, fase, indice, opciones, pctPausa, resumen, tiempos, TOLERANCIA,
   type AggFase, type Dimension, type Fase,
@@ -16,6 +16,7 @@ import {
   resumir, SITUACIONES, type Analisis, type Ejecucion,
 } from "../seguimiento-calculo";
 import { nombreServicio } from "../servicios";
+import { ESCENARIOS, proyeccion, type ItemProyeccion } from "../proyeccion";
 import { cols, type DefRegion, type PaginaExcel, type Region } from "./tipos";
 
 const FASE = { desa: "Desarrollo", test: "Testing" } as const;
@@ -432,6 +433,11 @@ export async function paginaExcel(ruta: string, sp: SearchParams): Promise<Pagin
     const { f, meta } = await contextoHistorico(sp);
     return { titulo: historicas[ruta].titulo(f), meta, regiones: historicas[ruta].regiones(f) };
   }
+  if (ruta === "/en-curso/proyeccion") {
+    const ctx = await contextoSeguimiento(sp);
+    const f = { ...ctx.f, fases: [], etapas: [], situaciones: [] };
+    return { titulo: "Proyección de entregas", meta: ctx.meta, regiones: paginaProyeccion(f) };
+  }
   const enCurso: Record<string, { titulo: string; fase?: Fase; regiones: (items: Analisis[]) => DefRegion[] }> = {
     "/en-curso": { titulo: "Requerimientos en curso", regiones: paginaEnCurso },
     "/en-curso/desarrollo": { titulo: "Desarrollo en curso", fase: "desa", regiones: (i) => paginaSeguimientoFase("desa", i) },
@@ -444,6 +450,59 @@ export async function paginaExcel(ruta: string, sp: SearchParams): Promise<Pagin
   const filtros: FiltrosSeguimiento = def.fase ? { ...ctx.f, fases: [] } : ctx.f;
   const base = def.fase ? ctx.analisis.filter((a) => a.fase === def.fase) : ctx.analisis;
   return { titulo: def.titulo, meta: ctx.meta, regiones: def.regiones(aplicarFiltros(base, filtros)) };
+}
+
+function paginaProyeccion(f: FiltrosSeguimiento): DefRegion[] {
+  const datos = memo(() => proyeccion(f));
+  const nombreCol = (c: string) => (c === "siguiente" ? "Año siguiente" : `${MESES[+c.slice(5, 7) - 1]} ${c.slice(0, 4)}`);
+  return [
+    { id: "proyeccion", titulo: "Proyección por mes", construir: async () => {
+      const p = await datos();
+      const columnas = [
+        ...cols(["equipo", "Equipo", "texto"], ["concepto", "Concepto", "texto"]),
+        ...p.columnas.map((c) => ({ clave: c, titulo: nombreCol(c) + (c === p.meses[0] ? " (en curso)" : ""), tipo: "gs" as const })),
+        ...cols(["total", "Total (Gs.)", "gs"], ["vencidos", "Vencidos sin entregar (Gs.)", "gs"], ["sin_fecha", "Sin fecha vigente (Gs.)", "gs"]),
+      ];
+      const fila = (equipo: string, concepto: string, valores: number[], vencidos: number | null, sinFecha: number | null) => ({
+        equipo, concepto, ...Object.fromEntries(p.columnas.map((c, i) => [c, valores[i]])),
+        total: valores.reduce((s, v) => s + v, 0), vencidos, sin_fecha: sinFecha,
+      });
+      const v = (k: "desa" | "test", t: "entregado" | "proyectado") => p.matriz.map((c) => c[k][t]);
+      const sum = (a: number[], b: number[]) => a.map((x, i) => x + b[i]);
+      const filas = [
+        fila("Desarrollo", "Ya entregado", v("desa", "entregado"), null, null),
+        fila("Desarrollo", "Por entregar", v("desa", "proyectado"), p.vencidos.desa, p.sinFecha.desa),
+        fila("Desarrollo", "Total", sum(v("desa", "entregado"), v("desa", "proyectado")), p.vencidos.desa, p.sinFecha.desa),
+        fila("Testing", "Ya entregado", v("test", "entregado"), null, null),
+        fila("Testing", "Por entregar", v("test", "proyectado"), p.vencidos.test, p.sinFecha.test),
+        fila("Testing", "Total", sum(v("test", "entregado"), v("test", "proyectado")), p.vencidos.test, p.sinFecha.test),
+        fila("Ambos equipos", "Total", sum(sum(v("desa", "entregado"), v("desa", "proyectado")), sum(v("test", "entregado"), v("test", "proyectado"))),
+          p.vencidos.desa + p.vencidos.test, p.sinFecha.desa + p.sinFecha.test),
+        fila("Ambos equipos", "De fecha estimada", p.matriz.map((c) => c.estimado), null, null),
+      ];
+      return una({ id: "proyeccion", titulo: "Proyección por mes y equipo", columnas, filas,
+        nota: "Si hay desarrollo y testing manda el fin de testing; si solo hay desarrollo, el fin de desarrollo; si es solo testing, el fin de testing. Fechas corregidas por pausas, en días hábiles." });
+    } },
+    { id: "detalle", titulo: "Detalle por SGR", construir: async () => {
+      const p = await datos();
+      const destino = (i: ItemProyeccion) => i.destino === "entregado" ? `${nombreCol(i.mes!)}: entregado`
+        : i.destino === "vencido" ? "Vencido sin entregar" : i.destino === "sin_fecha" ? "Sin fecha vigente" : nombreCol(i.mes!);
+      const orden = { entregado: 0, proyectado: 1, vencido: 2, sin_fecha: 3 };
+      return una({
+        id: "detalle", titulo: "Detalle por SGR",
+        columnas: cols(["destino", "Mes asignado", "texto"], ["sgr", "SGR", "texto"], ["asunto", "Asunto", "texto"], ["escenario", "Escenario", "texto"],
+          ["situacion", "Situación", "texto"], ["responsable", "Responsable", "texto"], ["lider", "Líder", "texto"], ["tipo", "Tipo de servicio", "texto"],
+          ["fecha", "Fecha que manda", "fecha"], ["base", "Fecha de", "texto"], ["estimada", "Fecha estimada", "texto"],
+          ["desa", "Desarrollo (Gs.)", "gs"], ["test", "Testing (Gs.)", "gs"], ["total", "Total (Gs.)", "gs"], ["origen", "Origen", "texto"]),
+        filas: [...p.items].sort((a, b) => orden[a.destino] - orden[b.destino] || String(a.mes ?? "").localeCompare(String(b.mes ?? ""))).map((i) => ({
+          destino: destino(i), sgr: i.id_req, asunto: i.asunto, escenario: ESCENARIOS[i.escenario], situacion: i.situacion, responsable: i.responsable,
+          lider: i.lider, tipo: i.tipo, fecha: i.fecha, base: i.base === "fin_testing" ? "Fin de testing" : "Fin de desarrollo",
+          estimada: i.estimada ? "Sí" : "No", desa: i.desa, test: i.test, total: i.desa + i.test,
+          origen: i.origen === "implementado" ? "Implementado" : "En curso",
+        })),
+      });
+    } },
+  ];
 }
 
 function memo<T>(fn: () => Promise<T>) {

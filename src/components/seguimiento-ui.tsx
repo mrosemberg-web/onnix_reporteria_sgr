@@ -8,10 +8,12 @@ import {
   CAUSAS, ETAPAS, EJECUCION, ORDEN_CAUSAS, ORDEN_ETAPAS, SITUACIONES, type Analisis, type Causa,
 } from "@/lib/seguimiento-calculo";
 
-export function EncabezadoSeguimiento({ titulo, bajada, f, op, cargas, mostrarFase = true }: {
+export function EncabezadoSeguimiento({ titulo, bajada, f, op, cargas, mostrarFase = true, soloPersonas = false }: {
   titulo: string; bajada?: React.ReactNode; f: FiltrosSeguimiento;
   op: { lideres: string[]; personas: string[]; nombres: Map<string, string>; servicios: string[] };
   cargas: CargaSeguimiento[]; mostrarFase?: boolean;
+  /** Solo filtros de líder, persona y tipo de servicio (sin etapa ni situación). */
+  soloPersonas?: boolean;
 }) {
   const filtros = [
     ...(mostrarFase ? [{ param: "fase", etiqueta: "Fase", seleccion: f.fases,
@@ -19,9 +21,9 @@ export function EncabezadoSeguimiento({ titulo, bajada, f, op, cargas, mostrarFa
     { param: "lider", etiqueta: "Líder", seleccion: f.lideres, opciones: op.lideres.map((l) => ({ valor: l, texto: op.nombres.get(l) ?? l })) },
     { param: "persona", etiqueta: "Persona", seleccion: f.personas, opciones: op.personas.map((p) => ({ valor: p, texto: op.nombres.get(p) ?? p })) },
     { param: "tservicio", etiqueta: "Tipo de servicio", seleccion: f.servicios, opciones: op.servicios.map((s) => ({ valor: s, texto: s })) },
-    { param: "etapa", etiqueta: "Etapa", seleccion: f.etapas, opciones: ORDEN_ETAPAS.map((e) => ({ valor: e, texto: ETAPAS[e].nombre })) },
+    ...(soloPersonas ? [] : [{ param: "etapa", etiqueta: "Etapa", seleccion: f.etapas, opciones: ORDEN_ETAPAS.map((e) => ({ valor: e, texto: ETAPAS[e].nombre })) },
     { param: "situacion", etiqueta: "Situación", seleccion: f.situaciones,
-      opciones: (["atrasado", "vence_pronto", "en_plazo", "replanificacion", "sin_plan", "fin_tarde", "fin_a_tiempo"] as const).map((s) => ({ valor: s, texto: SITUACIONES[s].nombre })) },
+      opciones: (["atrasado", "vence_pronto", "en_plazo", "replanificacion", "sin_plan", "fin_tarde", "fin_a_tiempo"] as const).map((s) => ({ valor: s, texto: SITUACIONES[s].nombre })) }]),
   ];
   const cortes = cargas.map((c) => `${c.tipo === "seguimiento_desa" ? "desarrollo" : "testing"} al ${fecha(c.fecha_corte)} («${c.archivo}»)`).join("; ");
   return (

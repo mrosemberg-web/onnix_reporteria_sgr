@@ -43,7 +43,7 @@ export async function cargarSeguimiento() {
     const lideres = lideresDe(deFase);
     for (const f of deFase) analisis.push(analizar(f, corte[fase], lideres, fer));
   }
-  return { analisis, cargas, corte };
+  return { analisis, cargas, corte, feriados: fer };
 }
 
 export function aplicarFiltros(items: Analisis[], f: FiltrosSeguimiento) {

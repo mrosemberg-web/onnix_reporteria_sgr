@@ -127,7 +127,7 @@ export function habiles(desde: number, hasta: number, fer: Feriados) {
 /** Días hábiles posteriores a "desde" hasta "hasta" inclusive. */
 const habilesDespues = (desde: number, hasta: number, fer: Feriados) => habiles(desde + DIA, hasta, fer);
 /** La fecha que resulta de sumar n días hábiles a otra. */
-function sumarHabiles(desde: number, n: number, fer: Feriados) {
+export function sumarHabiles(desde: number, n: number, fer: Feriados) {
   let t = desde;
   for (let k = 0; k < n; ) { t += DIA; if (esHabil(t, fer)) k++; }
   return t;
@@ -304,3 +304,7 @@ export function porDevolucionesTesting(items: Analisis[]) {
   }).filter((x) => x.n > 0);
 }
 export const ETIQUETA_DEVOLUCIONES = ["Sin devoluciones", "1 devolución", "2 devoluciones", "3 o más"];
+
+/** Utilidades de fecha para otros módulos. */
+export const fechaMs = fecha;
+export const aIso = iso;

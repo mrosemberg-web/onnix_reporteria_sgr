@@ -173,6 +173,20 @@ Los estados se agrupan en etapas por palabras clave (análisis y presupuesto, en
 
 Se filtran por fase, líder, persona, tipo de servicio, etapa y situación, y se exportan a PDF como el resto.
 
+### Proyección de entregas
+
+**En curso › Proyección de entregas** muestra los montos presupuestados por mes: el mes en curso, los siguientes hasta diciembre y un acumulado del año siguiente. Se desglosa por equipo, desarrollo (DOCORE) y testing (QAON).
+
+- **Un SGR, un mes.** Cada SGR entra completo en un solo mes, según la fecha que manda:
+  - *desarrollo y testing*: fin de testing (desarrollo y testing van a ese mes);
+  - *solo desarrollo*: fin de desarrollo;
+  - *solo testing de un desarrollo del cliente*: fin de testing.
+- **Reparto por equipo.** El importe de desarrollo va al equipo de desarrollo y el de testing, al de testing.
+- **Fecha usada.** Es la entrega corregida por pausas, en días hábiles.
+- **Fechas estimadas.** Si un SGR sigue en desarrollo pero necesita testing, el fin de testing se estima: entrega de desarrollo + importe de testing ÷ Gs. 200.000 por hora ÷ 8 horas por día hábil. Se marca como «Estimada».
+- **Ya entregado en el mes en curso.** Son los implementados de la planilla de facturación cuya fecha que manda cayó en el mes, y los SGR en «Testing Finalizado» o «Desarrollo Finalizado» con fecha de estado en el mes, hasta la fecha de corte.
+- **Montos que no entran en ningún mes.** Se muestran aparte los **vencidos sin entregar** (fecha pasada y todavía en curso) y los **sin fecha vigente** (sin estimación o en análisis de alcance).
+
 ## Estructura
 
 ```

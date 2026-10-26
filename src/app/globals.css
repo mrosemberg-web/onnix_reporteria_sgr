@@ -326,3 +326,5 @@ td.nombre { white-space: nowrap; }
 .panel > .titulo-region + * { margin-top: 14px; }
 .boton-excel { min-height: 26px !important; padding: 3px 9px !important; font-size: 0.78rem !important; gap: 5px !important; }
 .encabezado-titulo .boton { white-space: nowrap; }
+.tabla-proyeccion tr.grupo td { font-weight: 650; background: var(--superficie-2); color: var(--tinta); }
+.tabla-proyeccion tr.subtotal td { font-weight: 650; }
