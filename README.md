@@ -185,6 +185,7 @@ Se filtran por fase, líder, persona, tipo de servicio, etapa y situación, y se
 - **Fecha usada.** Es la entrega corregida por pausas, en días hábiles.
 - **Fechas estimadas.** Si un SGR sigue en desarrollo pero necesita testing, el fin de testing se estima: entrega de desarrollo + importe de testing ÷ Gs. 200.000 por hora ÷ 8 horas por día hábil. Se marca como «Estimada».
 - **Ya entregado en el mes en curso.** Son los implementados de la planilla de facturación cuya fecha que manda cayó en el mes, incluidos los desestimados con su importe, y los SGR en «Testing Finalizado» o «Desarrollo Finalizado» con fecha de estado en el mes, hasta la fecha de corte.
+- **Fecha de corte del mes.** Arriba de la pantalla se elige hasta qué fecha se considera entregable dentro de un mes. Lo estimado para después de esa fecha, dentro del mismo mes, pasa al mes siguiente; si es diciembre, pasa al año siguiente. Por ejemplo, con corte al 28/10/2026, un SGR estimado para el 29/10 pasa a noviembre. Por defecto es el último día del mes en curso, así que no cambia nada. La fecha queda en la URL (`?hasta=AAAA-MM-DD`), se aplica también al PDF y al Excel, y los SGR que cambian de mes llevan la marca «Pasa al mes siguiente». Lo ya entregado no se mueve.
 - **Montos que no entran en ningún mes.** Se muestran aparte los **vencidos sin entregar** (fecha pasada y todavía en curso) y los **sin fecha vigente** (sin estimación o en análisis de alcance).
 
 ## Estructura

@@ -1,4 +1,5 @@
 import { TituloRegion } from "@/components/BotonExcel";
+import { FechaCorteMes } from "@/components/FechaCorteMes";
 import { BarrasAcumulado } from "@/components/graficos";
 import { EncabezadoSeguimiento, SinSeguimiento } from "@/components/seguimiento-ui";
 import { Indicador, Lectura } from "@/components/ui";
@@ -20,7 +21,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
   const sesion = await requerirSesion();
   const sp = await searchParams;
   const f = { ...leerFiltrosSeguimiento(sp), fases: [], etapas: [], situaciones: [] };
-  const p = await proyeccion(f);
+  const p = await proyeccion(f, { hasta: Array.isArray(sp.hasta) ? sp.hasta[0] : sp.hasta });
   if (!p.analisis.length) return <SinSeguimiento esAdmin={sesion.rol === "admin"} />;
   const op = opcionesSeguimiento(p.analisis);
   const equipo = (fz: "desa" | "test") => p.analisis.find((a) => a.fase === fz && a.equipo)?.equipo ?? (fz === "desa" ? "Desarrollo" : "Testing");
@@ -44,7 +45,11 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
     };
   });
 
+  const nombreMes = (m: string) => (+m.slice(0, 4) > p.anioCorte ? "el año siguiente" : MESES_LARGOS[+m.slice(5, 7) - 1]);
   const lectura = [
+    !p.hastaPorDefecto ? (p.corridos.sgr
+      ? `Con la fecha de corte al ${fecha(p.hasta)}, ${num(p.corridos.sgr)} SGR (${gsCorto(p.corridos.monto)}) ${p.corridos.sgr === 1 ? "estimado para después de esa fecha pasa" : "estimados para después de esa fecha pasan"} de ${nombreMes(p.corridos.de)} a ${nombreMes(p.corridos.a)}.`
+      : `Con la fecha de corte al ${fecha(p.hasta)} ningún SGR cambia de mes.`) : "",
     `En ${nombreMesLargo(actual)} se proyectan ${gsCorto(tot(mesActual))}: ${gsCorto(mesActual.desa.entregado + mesActual.test.entregado)} ya entregados (${num(mesActual.entregados)} SGR) y ${gsCorto(mesActual.desa.proyectado + mesActual.test.proyectado)} por entregar (${num(mesActual.proyectados)} SGR).`,
     `Hasta diciembre suman ${gsCorto(totalAnio)}; el año siguiente acumula ${gsCorto(tot(siguiente))} en ${num(siguiente.proyectados)} SGR.`,
     venc ? `${num(p.vencidos.sgr)} SGR con la fecha vencida y sin entregar suman ${gsCorto(venc)}. No entran en ningún mes; si se entregaran este mes, el total de ${nombreMesLargo(actual)} llegaría a ${gsCorto(tot(mesActual) + venc)}.` : "",
@@ -69,6 +74,11 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
     <>
       <EncabezadoSeguimiento titulo="Proyección de entregas" op={op} f={f} cargas={p.cargas} mostrarFase={false} soloPersonas
         bajada={<>Montos presupuestados por mes y por equipo según la fecha estimada de entrega, corregida por pausas y en días hábiles. Si hay desarrollo y testing, manda el fin de testing; si solo hay desarrollo, el fin de desarrollo; si es solo testing de un desarrollo del cliente, el fin de testing.</>} />
+
+      <FechaCorteMes key={p.hasta} valor={p.hasta} min={p.limites.min} max={p.limites.max} porDefecto={p.hastaPorDefecto} />
+      {!p.hastaPorDefecto && (
+        <p className="solo-impresion impresion-meta">Fecha de corte del mes: {fecha(p.hasta)}. Lo estimado para después de esa fecha, dentro del mismo mes, pasa al mes siguiente.</p>
+      )}
 
       <section className="banda">
         <Indicador nombre={`${MESES[+actual.slice(5, 7) - 1]} (mes en curso)`} valor={gsCorto(tot(mesActual))} nota={`${gsCorto(mesActual.desa.entregado + mesActual.test.entregado)} ya entregados`} />
@@ -165,6 +175,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
                     {i.fecha ? fecha(i.fecha) : "–"}
                     <span className="debil"> {i.base === "fin_testing" ? "fin de testing" : "fin de desarrollo"}</span>
                     {i.estimada && <span className="etiqueta e-leve" style={{ marginLeft: 6 }}>Estimada</span>}
+                    {i.corrido && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }} title={`Posterior a la fecha de corte del mes (${fecha(p.hasta)})`}>Pasa al mes siguiente</span>}
                   </td>
                   <td className="n">{i.desa ? gs(i.desa) : "–"}</td>
                   <td className="n">{i.test ? gs(i.test) : "–"}</td>

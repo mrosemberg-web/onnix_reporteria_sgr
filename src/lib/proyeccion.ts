@@ -46,6 +46,8 @@ export type ItemProyeccion = {
   desestimado: boolean;
   /** Presupuesto × tarifa menos el importe de la planilla, si es positivo. */
   descuento: number | null;
+  /** Pasó al mes siguiente porque su fecha es posterior a la fecha de corte del mes. */
+  corrido: boolean;
 };
 
 const escenarioDe = (desa: number, test: number): Escenario | null =>
@@ -66,7 +68,7 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
     id_req: a.id_req, asunto: a.asunto, escenario: esc, origen: "en_curso" as const,
     situacion: `${a.fase === "desa" ? "Desarrollo" : "Testing"}: ${a.estado ?? ""}`, responsable: a.nombre ?? a.usuario,
     usuarios: [a.usuario], lider: a.lider, tipo: a.tipo_servicio, base: base as ItemProyeccion["base"], desa, test,
-    desestimado: false, descuento: null,
+    desestimado: false, descuento: null, corrido: false,
   };
   const finalizado = a.etapa === "finalizado";
   const mesCorte = corte.slice(0, 7);
@@ -103,7 +105,20 @@ type FilaHistorica = {
 
 export type Proyeccion = Awaited<ReturnType<typeof proyeccion>>;
 
-export async function proyeccion(f: FiltrosSeguimiento) {
+function finDeMes(mes: string) {
+  const [a, m] = mes.split("-").map(Number);
+  return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+}
+function mesSiguiente(mes: string) {
+  const [a, m] = mes.split("-").map(Number);
+  return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, "0")}`;
+}
+
+/**
+ * hasta: fecha de corte del mes. Lo que se estima entregar en el mismo mes pero
+ * después de esa fecha pasa al mes siguiente. Por defecto, el último día del mes en curso.
+ */
+export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: { hasta?: string } = {}) {
   const datos = await cargarSeguimiento();
   const corte = [datos.corte.desa, datos.corte.test].sort().at(-1)!;
   const anioCorte = +corte.slice(0, 4);
@@ -135,7 +150,7 @@ export async function proyeccion(f: FiltrosSeguimiento) {
       return {
         id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const,
         situacion: h.desestimado ? "Desestimado por el cliente (cuenta como entregado)" : "Implementado",
-        desestimado: h.desestimado, descuento: h.desestimado && h.descuento > 0 ? h.descuento : null,
+        desestimado: h.desestimado, descuento: h.desestimado && h.descuento > 0 ? h.descuento : null, corrido: false,
         responsable: usuarios.join(" / "), usuarios, lider: usuarios.map((u) => lideres.get(u)).find(Boolean) ?? null,
         tipo: h.tipo_requerimiento, fecha: h.fecha_fin, base: esc === 2 ? "fin_desarrollo" as const : "fin_testing" as const,
         estimada: false, destino: "entregado" as const, mes: corte.slice(0, 7), desa: h.desa, test: h.test,
@@ -146,6 +161,18 @@ export async function proyeccion(f: FiltrosSeguimiento) {
       (!f.lideres.length || (i.lider != null && f.lideres.includes(i.lider))) &&
       (!f.servicios.length || (i.tipo != null && f.servicios.includes(i.tipo))));
 
+  // Fecha de corte del mes: entre el inicio del mes en curso y el 31 de diciembre.
+  const finAnio = `${anioCorte}-12-31`;
+  const hasta = hastaPedido && /^\d{4}-\d{2}-\d{2}$/.test(hastaPedido) && hastaPedido >= inicioMes && hastaPedido <= finAnio
+    ? hastaPedido : finDeMes(corte.slice(0, 7));
+  const mesHasta = hasta.slice(0, 7);
+  for (const i of enCurso) {
+    if (i.destino === "proyectado" && i.mes === mesHasta && i.fecha && i.fecha > hasta) {
+      const sig = mesSiguiente(mesHasta);
+      i.mes = +sig.slice(0, 4) > anioCorte ? "siguiente" : sig;
+      i.corrido = true;
+    }
+  }
   const items = [...implementados, ...enCurso];
 
   // Columnas: mes actual hasta diciembre, y el año siguiente.
@@ -166,5 +193,11 @@ export async function proyeccion(f: FiltrosSeguimiento) {
     };
   });
   const bloque = (d: Destino) => { const l = celda(d); return { sgr: l.length, desa: suma(l, "desa"), test: suma(l, "test") }; };
-  return { corte, anioCorte, meses, columnas, matriz, vencidos: bloque("vencido"), sinFecha: bloque("sin_fecha"), items, cargas: datos.cargas, analisis: datos.analisis };
+  const corridos = enCurso.filter((i) => i.corrido);
+  return {
+    corte, anioCorte, meses, columnas, matriz, vencidos: bloque("vencido"), sinFecha: bloque("sin_fecha"), items,
+    cargas: datos.cargas, analisis: datos.analisis,
+    hasta, hastaPorDefecto: hasta === finDeMes(corte.slice(0, 7)), limites: { min: inicioMes, max: finAnio },
+    corridos: { sgr: corridos.length, monto: corridos.reduce((s, i) => s + i.desa + i.test, 0), de: mesHasta, a: mesSiguiente(mesHasta) },
+  };
 }

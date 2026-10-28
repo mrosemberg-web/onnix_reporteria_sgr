@@ -436,7 +436,9 @@ export async function paginaExcel(ruta: string, sp: SearchParams): Promise<Pagin
   if (ruta === "/en-curso/proyeccion") {
     const ctx = await contextoSeguimiento(sp);
     const f = { ...ctx.f, fases: [], etapas: [], situaciones: [] };
-    return { titulo: "Proyección de entregas", meta: ctx.meta, regiones: paginaProyeccion(f) };
+    const hasta = Array.isArray(sp.hasta) ? sp.hasta[0] : sp.hasta;
+    return { titulo: "Proyección de entregas", meta: [...ctx.meta, ["Fecha de corte del mes", hasta ? fecha(hasta) : "Último día del mes en curso"]],
+      regiones: paginaProyeccion(f, hasta) };
   }
   const enCurso: Record<string, { titulo: string; fase?: Fase; regiones: (items: Analisis[]) => DefRegion[] }> = {
     "/en-curso": { titulo: "Requerimientos en curso", regiones: paginaEnCurso },
@@ -452,8 +454,8 @@ export async function paginaExcel(ruta: string, sp: SearchParams): Promise<Pagin
   return { titulo: def.titulo, meta: ctx.meta, regiones: def.regiones(aplicarFiltros(base, filtros)) };
 }
 
-function paginaProyeccion(f: FiltrosSeguimiento): DefRegion[] {
-  const datos = memo(() => proyeccion(f));
+function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
+  const datos = memo(() => proyeccion(f, { hasta }));
   const nombreCol = (c: string) => (c === "siguiente" ? "Año siguiente" : `${MESES[+c.slice(5, 7) - 1]} ${c.slice(0, 4)}`);
   return [
     { id: "proyeccion", titulo: "Proyección por mes", construir: async () => {
@@ -494,13 +496,13 @@ function paginaProyeccion(f: FiltrosSeguimiento): DefRegion[] {
           ["situacion", "Situación", "texto"], ["responsable", "Responsable", "texto"], ["lider", "Líder", "texto"], ["tipo", "Tipo de servicio", "texto"],
           ["fecha", "Fecha que manda", "fecha"], ["base", "Fecha de", "texto"], ["estimada", "Fecha estimada", "texto"],
           ["desa", "Desarrollo (Gs.)", "gs"], ["test", "Testing (Gs.)", "gs"], ["total", "Total (Gs.)", "gs"], ["origen", "Origen", "texto"],
-          ["desestimado", "Desestimado", "texto"], ["descuento", "Descuento (Gs.)", "gs"]),
+          ["desestimado", "Desestimado", "texto"], ["descuento", "Descuento (Gs.)", "gs"], ["corrido", "Pasa al mes siguiente por la fecha de corte", "texto"]),
         filas: [...p.items].sort((a, b) => orden[a.destino] - orden[b.destino] || String(a.mes ?? "").localeCompare(String(b.mes ?? ""))).map((i) => ({
           destino: destino(i), sgr: i.id_req, asunto: i.asunto, escenario: ESCENARIOS[i.escenario], situacion: i.situacion, responsable: i.responsable,
           lider: i.lider, tipo: i.tipo, fecha: i.fecha, base: i.base === "fin_testing" ? "Fin de testing" : "Fin de desarrollo",
           estimada: i.estimada ? "Sí" : "No", desa: i.desa, test: i.test, total: i.desa + i.test,
           origen: i.origen === "implementado" ? "Implementado" : "En curso",
-          desestimado: i.desestimado ? "Sí" : "No", descuento: i.descuento,
+          desestimado: i.desestimado ? "Sí" : "No", descuento: i.descuento, corrido: i.corrido ? "Sí" : "No",
         })),
       });
     } },

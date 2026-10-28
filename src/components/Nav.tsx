@@ -21,7 +21,7 @@ const CURSO: Item[] = [
   { href: "/en-curso/desarrollo", texto: "Desarrollo en curso", claves: EN_CURSO },
   { href: "/en-curso/testing", texto: "Testing en curso", claves: EN_CURSO },
   { href: "/en-curso/equipo", texto: "Tablero del equipo", claves: EN_CURSO },
-  { href: "/en-curso/proyeccion", texto: "Proyección de entregas", claves: ["lider", "persona", "tservicio"] },
+  { href: "/en-curso/proyeccion", texto: "Proyección de entregas", claves: ["lider", "persona", "tservicio", "hasta"] },
 ];
 const ADMIN: Item[] = [
   { href: "/admin/carga", texto: "Cargar planillas" },

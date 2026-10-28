@@ -328,3 +328,6 @@ td.nombre { white-space: nowrap; }
 .encabezado-titulo .boton { white-space: nowrap; }
 .tabla-proyeccion tr.grupo td { font-weight: 650; background: var(--superficie-2); color: var(--tinta); }
 .tabla-proyeccion tr.subtotal td { font-weight: 650; }
+.corte-mes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; font-size: 0.85rem; }
+.corte-mes .boton { min-height: 36px; padding: 6px 14px; font-size: 0.88rem; }
+.corte-mes .debil { align-self: center; max-width: 380px; }
