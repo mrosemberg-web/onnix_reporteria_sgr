@@ -104,12 +104,13 @@ export function SinSeguimiento({ esAdmin }: { esAdmin: boolean }) {
 }
 
 export function TablaSgr({ items, corte, conPersona = true }: { items: Analisis[]; corte: { desa: string; test: string }; conPersona?: boolean }) {
+  const conDev = items.some((a) => a.fase === "test" && a.devNombre);
   return (
     <div className="tabla-env">
       <table>
         <thead>
           <tr>
-            <th>SGR</th><th>Asunto</th>{conPersona && <th>Responsable</th>}<th>Etapa</th><th className="n">Días hábiles en estado</th>
+            <th>SGR</th><th>Asunto</th>{conPersona && <th>Responsable</th>}{conDev && <th>Desarrollador</th>}<th>Etapa</th><th className="n">Días hábiles en estado</th>
             <th>Entrega estimada</th><th>Plan y atraso</th><th className="n">Atraso (hábiles)</th><th>Causa principal</th>
             <th className="n">Horas</th><th className="n">Consumo</th>
           </tr>
@@ -120,6 +121,7 @@ export function TablaSgr({ items, corte, conPersona = true }: { items: Analisis[
               <td>{a.id_req}{a.fase === "test" && (a.devoluciones ?? 0) > 0 && <span className="debil" title="Devoluciones al desarrollador"> ({a.devoluciones} dev.)</span>}</td>
               <td className="recorte" title={a.asunto ?? ""}>{a.asunto}</td>
               {conPersona && <td>{a.nombre ?? a.usuario}</td>}
+              {conDev && <td>{a.devNombre ?? "–"}{a.devNombre && a.devExterno && <span className="debil"> (cliente)</span>}</td>}
               <td><ChipEtapa a={a} /></td>
               <td className="n">{num(a.diasEnEstado)}{a.pausaSinRegistrar > 1 && (
                 <span className="etiqueta e-leve" style={{ marginLeft: 6 }} title={`${a.pausaSinRegistrar} días hábiles detenido sin horas pausadas registradas`}>Revisar pausa</span>)}</td>

@@ -49,17 +49,19 @@ export type FilaSeguimiento = {
   importe_desa: number | null;
   importe_test: number | null;
   importe_total: number | null;
+  /** Solo testing, opcional: quién desarrolló el SGR (de Onnix o del cliente). */
+  desarrollador: string | null;
 };
 
 export const COLUMNAS_SEGUIMIENTO: (keyof FilaSeguimiento)[] = [
   "fase", "id_req", "usuario", "nombre", "team_leader", "asunto", "estado", "tipo_servicio", "equipo",
   "fecha_estado", "devoluciones", "fecha_inicio", "horas_ayer", "horas_trab", "horas_presu", "entrega_estimada",
   "horas_pausadas_fase", "nueva_entrega", "otras_horas_pausadas", "total_horas_pausadas",
-  "importe_desa", "importe_test", "importe_total",
+  "importe_desa", "importe_test", "importe_total", "desarrollador",
 ];
 
 type Tipo = "texto" | "fecha" | "num" | "num0" | "entero";
-type Col = { col: keyof FilaSeguimiento; enc: Record<"desa" | "test", string | null>; tipo: Tipo; requerida: boolean };
+type Col = { col: keyof FilaSeguimiento; enc: Record<"desa" | "test", string | string[] | null>; tipo: Tipo; requerida: boolean };
 
 // num: vacío = sin dato (null). num0: vacío = 0.
 const COLS: Col[] = [
@@ -85,6 +87,8 @@ const COLS: Col[] = [
   { col: "importe_desa", enc: { desa: "importe fact desa", test: "importe fact desa" }, tipo: "num", requerida: false },
   { col: "importe_test", enc: { desa: "importe fact test", test: "importe fact test" }, tipo: "num", requerida: false },
   { col: "importe_total", enc: { desa: "importe fact total", test: "importe fact total" }, tipo: "num", requerida: false },
+  { col: "desarrollador", tipo: "texto", requerida: false, enc: { desa: null,
+    test: ["desarrollador", "usuario desarrollador", "desarrollador asignado", "asignado a desarrollo", "asignado desarrollo", "responsable desarrollo"] } },
 ];
 
 export function leerSeguimiento(txt: string, fase: "desa" | "test") {
@@ -96,11 +100,12 @@ export function leerSeguimiento(txt: string, fase: "desa" | "test") {
   const enc = matriz[0].map(normalizarEncabezado);
   const indice = new Map<keyof FilaSeguimiento, number>();
   for (const c of COLS) {
-    const nombre = c.enc[fase];
-    if (!nombre) continue;
-    const i = enc.indexOf(nombre);
+    const nombres = c.enc[fase];
+    if (!nombres) continue;
+    const candidatos = Array.isArray(nombres) ? nombres : [nombres];
+    const i = enc.findIndex((h) => candidatos.includes(h));
     if (i >= 0) indice.set(c.col, i);
-    else if (c.requerida) errores.push(`Falta la columna "${nombre}".`);
+    else if (c.requerida) errores.push(`Falta la columna "${candidatos[0]}".`);
   }
   if (errores.length) return { filas: [], advertencias, errores };
 
@@ -126,7 +131,7 @@ export function leerSeguimiento(txt: string, fase: "desa" | "test") {
         else fila[c.col] = c.tipo === "entero" ? Math.round(v) : v;
       }
     }
-    if (fase === "desa") fila.devoluciones = null;
+    if (fase === "desa") { fila.devoluciones = null; fila.desarrollador = null; }
     const f = fila as FilaSeguimiento;
     if (!f.usuario || !f.id_req) { advertencias.push(`Línea ${linea}: sin usuario o sin Nro Sgr; se omitió.`); continue; }
     if (f.id_req !== "0") {

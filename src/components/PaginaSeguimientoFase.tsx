@@ -8,7 +8,8 @@ import { dias, horas, num, pct } from "@/lib/formato";
 import { lecturaSeguimiento } from "@/lib/lectura-seguimiento";
 import { aplicarFiltros, cargarSeguimiento, leerFiltrosSeguimiento, opcionesSeguimiento } from "@/lib/seguimiento";
 import {
-  agruparPorPersona, CAUSAS, ETIQUETA_DEVOLUCIONES, ORDEN_CAUSAS, porDevolucionesTesting, resumir, type Analisis,
+  agruparPorPersona, CAUSAS, devolucionesPorDesarrollador, ETIQUETA_DEVOLUCIONES, ORDEN_CAUSAS, porDevolucionesTesting, resumir,
+  type Analisis,
 } from "@/lib/seguimiento-calculo";
 
 const TEXTO = {
@@ -33,6 +34,17 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
   const r = resumir(items);
 
   const personas = agruparPorPersona(items);
+
+  // Devoluciones de testing atribuidas a cada desarrollador (columna Desarrollador del CSV de testing).
+  const hayDesarrollador = analisis.some((a) => a.fase === "test" && a.desarrollador);
+  const liderDe = new Map(deFase.map((a) => [a.usuario, a.lider]));
+  const devs = fz === "desa" ? devolucionesPorDesarrollador(analisis.filter((a) =>
+    a.fase === "test" &&
+    (!f.personas.length || (a.devUsuario != null && f.personas.includes(a.devUsuario))) &&
+    (!f.lideres.length || (a.devUsuario != null && f.lideres.includes(liderDe.get(a.devUsuario) ?? ""))) &&
+    (!f.servicios.length || (a.tipo_servicio != null && f.servicios.includes(a.tipo_servicio))))) : [];
+  const devDe = new Map(devs.filter((d) => d.usuario).map((d) => [d.usuario!, d]));
+  const mostrarDev = fz === "test" || hayDesarrollador || personas.some((p) => p.r.causas.devoluciones > 0);
   const conAtraso = personas.filter((p) => p.r.diasAtraso > 0);
 
   const ordenados = [...sgr].sort((a, b) =>
@@ -78,7 +90,9 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
               <tr>
                 <th>{t.persona}</th><th>Líder</th><th className="n">SGR</th><th className="n">En trabajo</th><th className="n">Cliente</th>
                 {fz === "test" && <th className="n">Devoluciones</th>}
-                <th className="n">Atrasados</th><th className="n">Atraso externo</th><th className="n">Atraso por devoluciones</th>
+                {fz === "desa" && mostrarDev && <th className="n">Devoluciones recibidas</th>}
+                <th className="n">Atrasados</th><th className="n">Atraso externo</th>
+                {mostrarDev && <th className="n">{fz === "test" ? "Esperando corrección del desarrollador" : "Atraso por devoluciones"}</th>}
                 <th className="n">Pausa sin motivo</th><th className="n">Atraso por ejecución</th><th className="n">Horas ayer</th><th className="n">Horas usadas</th><th className="n">Excedidos</th>
               </tr>
             </thead>
@@ -91,9 +105,10 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
                   <td className="n">{num(p.r.porEtapa.activo)}</td>
                   <td className="n">{num(p.r.esperandoCliente)}</td>
                   {fz === "test" && <td className="n">{num(p.r.devoluciones)}</td>}
+                  {fz === "desa" && mostrarDev && <td className="n">{num(devDe.get(p.usuario)?.devoluciones ?? 0)}</td>}
                   <td className="n">{num(p.r.atrasados)}</td>
                   <td className="n">{dias(p.r.causas.pausas + p.r.causas.cliente)}</td>
-                  <td className="n">{dias(p.r.causas.devoluciones)}</td>
+                  {mostrarDev && <td className="n">{dias(p.r.causas.devoluciones + (fz === "desa" ? devDe.get(p.usuario)?.atraso ?? 0 : 0))}</td>}
                   <td className="n">{dias(p.r.causas.pausa)}</td>
                   <td className="n" style={{ color: p.r.causas.ejecucion > 0 ? "var(--mal)" : undefined }}>{dias(p.r.causas.ejecucion)}</td>
                   <td className="n">{horas(p.r.horasAyer)}</td>
@@ -105,12 +120,55 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
           </table>
         </div>
         <p className="debil" style={{ marginTop: 10, fontSize: "0.82rem" }}>
-          Atraso externo: espera del cliente y pausas anteriores. Pausa sin motivo: días en pausa sin indicar si se espera al cliente.
-          Horas usadas: horas trabajadas sobre presupuestadas, en SGR con presupuesto y horas cargadas.
+          Todos los días son hábiles. <strong>Atrasados</strong>: SGR con la entrega estimada vencida. <strong>Atraso externo</strong>: días por espera del
+          cliente (Aguardando retorno FPJ, pruebas UAT, cambios en el requerimiento) y pausas anteriores registradas; no dependen del equipo.{" "}
+          {fz === "desa" && mostrarDev && <><strong>Devoluciones recibidas</strong>: veces que testing devolvió SGR de esta persona, por actualización de fuentes o
+          errores encontrados. <strong>Atraso por devoluciones</strong>: días que esos SGR estuvieron frenados en testing esperando su corrección.{" "}</>}
+          {fz === "test" && <><strong>Esperando corrección del desarrollador</strong>: días de atraso de SGR devueltos al desarrollador; no es demora del tester.{" "}</>}
+          <strong>Pausa sin motivo</strong>: días en pausa sin indicar si se espera al cliente. <strong>Atraso por ejecución</strong>: atraso que no explican
+          las causas anteriores. <strong>Horas usadas</strong>: horas trabajadas sobre presupuestadas, en SGR con presupuesto y horas cargadas.
+          <strong> Excedidos</strong>: SGR con más horas trabajadas que presupuestadas.
+          {fz === "desa" && !hayDesarrollador && <> Para atribuir las devoluciones de testing a cada desarrollador, la planilla de testing debe incluir la columna «Desarrollador».</>}
         </p>
       </section>
 
       {fz === "test" && <DevolucionesTesting items={sgr} />}
+
+      {fz === "desa" && hayDesarrollador && (
+        <section className="panel">
+          <div className="panel-cab">
+            <TituloRegion region="devoluciones_dev">Devoluciones de testing por desarrollador</TituloRegion>
+            <p>SGR que hoy están en testing, según quién los desarrolló. Incluye desarrolladores del cliente.</p>
+          </div>
+          {devs.length === 0 ? <p className="debil">No hay SGR en testing para los filtros elegidos.</p> : (
+            <div className="tabla-env">
+              <table>
+                <thead>
+                  <tr><th>Desarrollador</th><th>Origen</th><th className="n">SGR en testing</th><th className="n">SGR con devoluciones</th>
+                    <th className="n">Devoluciones</th><th className="n">Devueltos hoy</th><th className="n">Atraso por devoluciones</th></tr>
+                </thead>
+                <tbody>
+                  {devs.map((d) => (
+                    <tr key={d.clave}>
+                      <td className="nombre">{d.nombre}</td>
+                      <td><span className={`etiqueta ${d.externo ? "e-test" : "e-desa"}`}>{d.externo ? "Del cliente" : "Onnix"}</span></td>
+                      <td className="n">{num(d.sgr)}</td>
+                      <td className="n">{num(d.sgrConDevolucion)}</td>
+                      <td className="n">{num(d.devoluciones)}</td>
+                      <td className="n">{d.devueltosAhora || ""}</td>
+                      <td className="n">{dias(d.atraso)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="debil" style={{ marginTop: 10, fontSize: "0.82rem" }}>
+            «Del cliente»: SGR sin importe de desarrollo, que desarrolló el equipo del cliente (por ejemplo DITA o DPJ). Atraso por devoluciones: días hábiles
+            que el SGR estuvo frenado en testing esperando la corrección.
+          </p>
+        </section>
+      )}
 
       <section className="panel">
         <div className="panel-cab">

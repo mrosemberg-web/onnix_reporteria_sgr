@@ -105,6 +105,12 @@ export type Analisis = FilaSeguimiento & {
   horasExcedidas: number;
   /** Días hábiles de la detención actual que no figuran en las horas pausadas (dato a revisar). */
   pausaSinRegistrar: number;
+  /** Solo testing: desarrollador reconocido en la planilla de desarrollo (usuario), o null. */
+  devUsuario: string | null;
+  /** Solo testing: nombre del desarrollador para mostrar. */
+  devNombre: string | null;
+  /** Solo testing: el desarrollo es del cliente (SGR sin importe de desarrollo). */
+  devExterno: boolean;
 };
 
 const DIA = 86_400_000;
@@ -153,7 +159,8 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   const detenido = etapa === "cliente" || etapa === "devuelto" || etapa === "pausa";
   const pausaSinRegistrar = detenido && S != null
     ? Math.max(0, Math.floor(habilesDespues(S, C, fer) - diasPausa)) : 0;
-  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida };
+  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida,
+    devUsuario: null, devNombre: f.desarrollador ?? null, devExterno: (f.importe_desa ?? 0) === 0 };
   if (etapa === "sin_asignacion") {
     return { ...base, situacion: "sin_asignacion", atraso: null, causaPrincipal: null, avance: null, ejecucion: null };
   }
@@ -308,3 +315,34 @@ export const ETIQUETA_DEVOLUCIONES = ["Sin devoluciones", "1 devolución", "2 de
 /** Utilidades de fecha para otros módulos. */
 export const fechaMs = fecha;
 export const aIso = iso;
+
+export type DevolucionesDesarrollador = {
+  clave: string;
+  usuario: string | null;
+  nombre: string;
+  externo: boolean;
+  sgr: number;
+  sgrConDevolucion: number;
+  devoluciones: number;
+  devueltosAhora: number;
+  /** Días hábiles de atraso de testing atribuidos a devoluciones de este desarrollador. */
+  atraso: number;
+};
+
+/** Devoluciones de testing agrupadas por el desarrollador del SGR (columna Desarrollador del CSV de testing). */
+export function devolucionesPorDesarrollador(itemsTesting: Analisis[]): DevolucionesDesarrollador[] {
+  const mapa = new Map<string, DevolucionesDesarrollador>();
+  for (const a of itemsTesting) {
+    if (a.fase !== "test" || !a.devNombre || a.etapa === "sin_asignacion") continue;
+    const externo = a.devExterno;
+    const clave = a.devUsuario ?? `${externo ? "cliente" : "onnix"}:${a.devNombre.toLowerCase()}`;
+    const d = mapa.get(clave) ?? { clave, usuario: a.devUsuario, nombre: a.devNombre, externo, sgr: 0, sgrConDevolucion: 0, devoluciones: 0, devueltosAhora: 0, atraso: 0 };
+    d.sgr++;
+    d.devoluciones += a.devoluciones ?? 0;
+    if ((a.devoluciones ?? 0) > 0) d.sgrConDevolucion++;
+    if (a.etapa === "devuelto") d.devueltosAhora++;
+    if (a.etapa !== "finalizado") d.atraso += a.causas.devoluciones;
+    mapa.set(clave, d);
+  }
+  return [...mapa.values()].sort((a, b) => Number(a.externo) - Number(b.externo) || b.devoluciones - a.devoluciones || b.atraso - a.atraso);
+}

@@ -12,7 +12,7 @@ import {
   aplicarFiltros, cargarSeguimiento, leerFiltrosSeguimiento, opcionesSeguimiento, type FiltrosSeguimiento,
 } from "../seguimiento";
 import {
-  agruparPorPersona, CAUSAS, EJECUCION, ETAPAS, ETIQUETA_DEVOLUCIONES, ORDEN_CAUSAS, ORDEN_ETAPAS, porDevolucionesTesting,
+  agruparPorPersona, CAUSAS, devolucionesPorDesarrollador, EJECUCION, ETAPAS, ETIQUETA_DEVOLUCIONES, ORDEN_CAUSAS, ORDEN_ETAPAS, porDevolucionesTesting,
   resumir, SITUACIONES, type Analisis, type Ejecucion,
 } from "../seguimiento-calculo";
 import { nombreServicio } from "../servicios";
@@ -273,6 +273,7 @@ async function contextoSeguimiento(sp: SearchParams) {
 
 const colsDetalleSeg = cols(
   ["sgr", "SGR", "texto"], ["fase", "Fase", "texto"], ["asunto", "Asunto", "texto"], ["responsable", "Responsable", "texto"],
+  ["desarrollador", "Desarrollador (testing)", "texto"], ["dev_cliente", "Desarrollo del cliente", "texto"],
   ["usuario", "Usuario", "texto"], ["lider", "Líder", "texto"], ["tservicio", "Tipo de servicio", "texto"], ["estado", "Estado", "texto"],
   ["etapa", "Etapa", "texto"], ["situacion", "Situación", "texto"], ["fecha_estado", "Fecha del estado", "fecha"],
   ["dias_estado", "Días hábiles en el estado", "entero"], ["inicio", "Inicio", "fecha"], ["estimada", "Entrega estimada", "fecha"],
@@ -286,6 +287,7 @@ const colsDetalleSeg = cols(
 );
 const filaSeg = (a: Analisis) => ({
   sgr: a.id_req, fase: FASE[a.fase], asunto: a.asunto, responsable: a.nombre ?? a.usuario, usuario: a.usuario, lider: a.lider,
+  desarrollador: a.fase === "test" ? a.devNombre : null, dev_cliente: a.fase === "test" && a.devNombre ? (a.devExterno ? "Sí" : "No") : null,
   tservicio: a.tipo_servicio, estado: a.estado, etapa: ETAPAS[a.etapa].nombre, situacion: SITUACIONES[a.situacion].nombre,
   fecha_estado: a.fecha_estado, dias_estado: a.diasEnEstado, inicio: a.fecha_inicio, estimada: a.entrega_estimada, corregida: a.entregaCorregida,
   atraso: a.atraso, causa: a.causaPrincipal ? CAUSAS[a.causaPrincipal].nombre : null,
@@ -351,9 +353,11 @@ function paginaEnCurso(items: Analisis[]): DefRegion[] {
   ];
 }
 
-function paginaSeguimientoFase(fz: Fase, items: Analisis[]): DefRegion[] {
+function paginaSeguimientoFase(fz: Fase, items: Analisis[], testing: Analisis[] = []): DefRegion[] {
   const persona = fz === "desa" ? "Desarrollador" : "Tester";
   const personas = agruparPorPersona(items);
+  const devs = fz === "desa" ? devolucionesPorDesarrollador(testing) : [];
+  const devDe = new Map(devs.filter((d) => d.usuario).map((d) => [d.usuario!, d]));
   const regiones: DefRegion[] = [
     { id: "atraso_persona", titulo: "Atraso por persona", construir: async () => una({
       id: "atraso_persona", titulo: `Atraso por ${persona.toLowerCase()} y causa`,
@@ -366,18 +370,29 @@ function paginaSeguimientoFase(fz: Fase, items: Analisis[]): DefRegion[] {
       columnas: cols(["persona", persona, "texto"], ["usuario", "Usuario", "texto"], ["lider", "Líder", "texto"], ["sgr", "SGR", "entero"],
         ["activo", "En trabajo", "entero"], ["cliente", "Esperando al cliente", "entero"],
         ...(fz === "test" ? [["devoluciones", "Devoluciones al desarrollador", "entero"] as [string, string, "entero"]] : []),
+        ...(fz === "desa" ? [["recibidas", "Devoluciones recibidas de testing", "entero"] as [string, string, "entero"]] : []),
         ["atrasados", "Atrasados", "entero"], ["externo", "Atraso externo (cliente y pausas anteriores)", "entero"],
-        ["por_dev", "Atraso por devoluciones", "entero"], ["pausa", "Pausa sin motivo", "entero"], ["ejec", "Atraso por ejecución", "entero"],
+        ["por_dev", fz === "test" ? "Esperando corrección del desarrollador" : "Atraso por devoluciones", "entero"], ["pausa", "Pausa sin motivo", "entero"], ["ejec", "Atraso por ejecución", "entero"],
         ["ayer", "Horas ayer", "horas"], ["trab", "Horas trabajadas (con presupuesto)", "horas"], ["presu", "Horas presupuestadas", "horas"],
         ["usadas", "Horas usadas", "pct"], ["excedidos", "SGR excedidos en horas", "entero"], ["sin_sgr", "Sin SGR asignado", "texto"]),
       filas: personas.map((p) => ({
         persona: p.nombre, usuario: p.usuario, lider: p.lider, sgr: p.r.sgr, activo: p.r.porEtapa.activo, cliente: p.r.esperandoCliente,
-        devoluciones: p.r.devoluciones, atrasados: p.r.atrasados, externo: p.r.causas.pausas + p.r.causas.cliente, por_dev: p.r.causas.devoluciones,
+        devoluciones: p.r.devoluciones, recibidas: devDe.get(p.usuario)?.devoluciones ?? 0, atrasados: p.r.atrasados,
+        externo: p.r.causas.pausas + p.r.causas.cliente, por_dev: p.r.causas.devoluciones + (devDe.get(p.usuario)?.atraso ?? 0),
         pausa: p.r.causas.pausa, ejec: p.r.causas.ejecucion, ayer: p.r.horasAyer, trab: p.r.trabConPresu, presu: p.r.presuConTrab,
         usadas: p.r.presuConTrab ? p.r.trabConPresu / p.r.presuConTrab : null, excedidos: p.r.excedidos, sin_sgr: p.sinAsignacion ? "Sí" : "No",
       })),
     }) },
   ];
+  if (fz === "desa" && testing.some((a) => a.desarrollador)) regiones.push({ id: "devoluciones_dev", titulo: "Devoluciones por desarrollador", construir: async () => una({
+    id: "devoluciones_dev", titulo: "Devoluciones de testing por desarrollador",
+    columnas: cols(["nombre", "Desarrollador", "texto"], ["origen", "Origen", "texto"], ["sgr", "SGR en testing", "entero"],
+      ["con_dev", "SGR con devoluciones", "entero"], ["devoluciones", "Devoluciones", "entero"], ["hoy", "Devueltos hoy", "entero"],
+      ["atraso", "Atraso por devoluciones (días hábiles)", "entero"]),
+    filas: devs.map((d) => ({ nombre: d.nombre, origen: d.externo ? "Del cliente" : "Onnix", sgr: d.sgr, con_dev: d.sgrConDevolucion,
+      devoluciones: d.devoluciones, hoy: d.devueltosAhora, atraso: d.atraso })),
+    nota: "Del cliente: SGR sin importe de desarrollo, desarrollados por el equipo del cliente.",
+  }) });
   if (fz === "test") regiones.push({ id: "devoluciones", titulo: "Devoluciones al desarrollador", construir: async () => una({
     id: "devoluciones", titulo: "Devoluciones al desarrollador",
     columnas: cols(["grupo", "Devoluciones", "texto"], ["sgr", "SGR", "entero"], ["atrasados", "Con atraso", "entero"],
@@ -442,13 +457,22 @@ export async function paginaExcel(ruta: string, sp: SearchParams): Promise<Pagin
   }
   const enCurso: Record<string, { titulo: string; fase?: Fase; regiones: (items: Analisis[]) => DefRegion[] }> = {
     "/en-curso": { titulo: "Requerimientos en curso", regiones: paginaEnCurso },
-    "/en-curso/desarrollo": { titulo: "Desarrollo en curso", fase: "desa", regiones: (i) => paginaSeguimientoFase("desa", i) },
+    "/en-curso/desarrollo": { titulo: "Desarrollo en curso", fase: "desa", regiones: (i) => paginaSeguimientoFase("desa", i, testingDe(i)) },
     "/en-curso/testing": { titulo: "Testing en curso", fase: "test", regiones: (i) => paginaSeguimientoFase("test", i) },
     "/en-curso/equipo": { titulo: "Tablero del equipo", regiones: paginaTablero },
   };
   const def = enCurso[ruta];
   if (!def) return null;
   const ctx = await contextoSeguimiento(sp);
+  // SGR en testing de los desarrolladores elegidos, para atribuirles las devoluciones.
+  const testingDe = (desa: Analisis[]) => {
+    const liderDe = new Map(ctx.analisis.filter((a) => a.fase === "desa").map((a) => [a.usuario, a.lider]));
+    void desa;
+    return ctx.analisis.filter((a) => a.fase === "test" &&
+      (!ctx.f.personas.length || (a.devUsuario != null && ctx.f.personas.includes(a.devUsuario))) &&
+      (!ctx.f.lideres.length || (a.devUsuario != null && ctx.f.lideres.includes(liderDe.get(a.devUsuario) ?? ""))) &&
+      (!ctx.f.servicios.length || (a.tipo_servicio != null && ctx.f.servicios.includes(a.tipo_servicio))));
+  };
   const filtros: FiltrosSeguimiento = def.fase ? { ...ctx.f, fases: [] } : ctx.f;
   const base = def.fase ? ctx.analisis.filter((a) => a.fase === def.fase) : ctx.analisis;
   return { titulo: def.titulo, meta: ctx.meta, regiones: def.regiones(aplicarFiltros(base, filtros)) };

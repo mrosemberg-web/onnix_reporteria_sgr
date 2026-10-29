@@ -173,6 +173,17 @@ Los estados se agrupan en etapas por palabras clave (análisis y presupuesto, en
 
 Se filtran por fase, líder, persona, tipo de servicio, etapa y situación, y se exportan a PDF como el resto.
 
+### Devoluciones por desarrollador
+
+La planilla de testing puede traer una columna **«Desarrollador»** (también se aceptan «Usuario desarrollador», «Desarrollador asignado» o «Asignado a desarrollo»). Con ella, las devoluciones de testing se atribuyen a quien desarrolló el SGR:
+
+- **El desarrollador se reconoce** por su usuario o por su nombre en la planilla de desarrollo.
+- **Desarrolladores del cliente**: si el SGR no tiene importe de desarrollo, el desarrollador se marca como «Del cliente», por ejemplo de DITA o DPJ. Si es de Onnix pero hoy no tiene SGR en desarrollo, se muestra igual con su nombre.
+- **Desarrollo en curso** suma las columnas «Devoluciones recibidas» y «Atraso por devoluciones» (días que esos SGR estuvieron frenados en testing), y la región «Devoluciones de testing por desarrollador», con los de Onnix y los del cliente.
+- **Testing en curso** muestra ese atraso como «Esperando corrección del desarrollador», para que no se lea como demora del tester, y agrega la columna Desarrollador al detalle.
+
+Sin la columna, las de devoluciones se ocultan en Desarrollo en curso y la nota indica cómo habilitarlas.
+
 ### Proyección de entregas
 
 **En curso › Proyección de entregas** muestra los montos presupuestados por mes: el mes en curso, los siguientes hasta diciembre y un acumulado del año siguiente. Se desglosa por equipo, desarrollo (DOCORE) y testing (QAON).

@@ -43,6 +43,20 @@ export async function cargarSeguimiento() {
     const lideres = lideresDe(deFase);
     for (const f of deFase) analisis.push(analizar(f, corte[fase], lideres, fer));
   }
+  // Desarrollador de los SGR en testing: se reconoce por usuario o por nombre de la planilla de desarrollo.
+  const clave = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const desarrolladores = new Map<string, { usuario: string; nombre: string }>();
+  for (const a of analisis.filter((x) => x.fase === "desa")) {
+    const d = { usuario: a.usuario, nombre: a.nombre ?? a.usuario };
+    desarrolladores.set(clave(a.usuario), d);
+    if (a.nombre) desarrolladores.set(clave(a.nombre), d);
+  }
+  for (const a of analisis) {
+    if (a.fase !== "test" || !a.desarrollador) continue;
+    const d = desarrolladores.get(clave(a.desarrollador));
+    a.devUsuario = d?.usuario ?? null;
+    a.devNombre = d?.nombre ?? a.desarrollador;
+  }
   return { analisis, cargas, corte, feriados: fer };
 }
 
