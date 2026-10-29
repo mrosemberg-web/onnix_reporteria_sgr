@@ -74,12 +74,13 @@ Conviene que la región de las funciones de Vercel coincida con la de Supabase. 
 
 ## Feriados
 
-En **Administración › Feriados** se mantiene la lista de días no laborables. Viene precargada con los feriados nacionales de Paraguay de 2025 y 2026, con sus traslados y feriados extraordinarios. En 2025: Día de los Héroes al 3 de marzo y Paz del Chaco al 16 de junio (Decreto 3047), y los feriados extraordinarios del 5 de setiembre (Decreto 4522) y del 26 de diciembre (Decreto 5040). En 2026, según la Ley 7544/2025:
+En **Administración › Feriados** se mantiene la lista de días no laborables. La tabla guarda fechas concretas, así que cada año necesita las suyas:
 
-- los trasladados: Día de los Héroes al 2 de marzo, Jura de la Constitución al 22 de junio y Batalla de Boquerón al 28 de septiembre (Decreto 6601);
-- el feriado extraordinario del 30 de junio (Decreto 6280).
+- **Precargar un año**: carga los feriados de la Ley 7544/2025 en su fecha legal, que son los fijos, Semana Santa (calculada para ese año) y los móviles (1/3, 12/6, 20/6 y 29/9). No modifica los que ya existen ni vuelve a crear los que ya se trasladaron, así que se puede ejecutar más de una vez.
+- **Trasladar un móvil**: cuando sale el decreto, en la fila del feriado se escribe el número de decreto y se elige «Al lunes anterior» o «Al lunes siguiente», que son los dos destinos que permite la ley. La fecha legal se reemplaza por la trasladada, que queda como «Trasladado» con la fecha que conmemora. Si fue un error, «Volver al …» la restaura.
+- **Feriados extraordinarios** (hasta tres por año, por decreto): se agregan con el formulario.
 
-Se carga la fecha en que efectivamente no se trabaja. Los cambios se aplican al instante en todos los reportes. Para años anteriores o siguientes hay que cargar sus feriados; sin ellos, esos años cuentan como hábiles todos los días de lunes a viernes.
+Ya están cargados 2025 y 2026 con sus traslados y extraordinarios, y 2027 en sus fechas legales. Sin feriados cargados, un año cuenta como hábiles todos los días de lunes a viernes.
 
 ## Usuarios
 

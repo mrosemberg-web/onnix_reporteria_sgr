@@ -331,3 +331,6 @@ td.nombre { white-space: nowrap; }
 .corte-mes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; font-size: 0.85rem; }
 .corte-mes .boton { min-height: 36px; padding: 6px 14px; font-size: 0.88rem; }
 .corte-mes .debil { align-self: center; max-width: 380px; }
+.traslado { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.traslado input[type="text"] { width: 120px; min-height: 28px; padding: 3px 8px; font-size: 0.8rem; }
+.traslado button { font: inherit; font-size: 0.8rem; padding: 4px 10px; border-radius: var(--r-chico); border: 1px solid var(--linea); background: var(--superficie); color: var(--desa); cursor: pointer; white-space: nowrap; }
