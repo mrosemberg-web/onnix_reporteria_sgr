@@ -47,9 +47,11 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
 
   const nombreMes = (m: string) => (+m.slice(0, 4) > p.anioCorte ? "el año siguiente" : MESES_LARGOS[+m.slice(5, 7) - 1]);
   const lectura = [
-    !p.hastaPorDefecto ? (p.corridos.sgr
-      ? `Con la fecha de corte al ${fecha(p.hasta)}, ${num(p.corridos.sgr)} SGR (${gsCorto(p.corridos.monto)}) ${p.corridos.sgr === 1 ? "estimado para después de esa fecha pasa" : "estimados para después de esa fecha pasan"} de ${nombreMes(p.corridos.de)} a ${nombreMes(p.corridos.a)}.`
-      : `Con la fecha de corte al ${fecha(p.hasta)} ningún SGR cambia de mes.`) : "",
+    p.mesCerrado
+      ? `La fecha de corte del mes (${fecha(p.hasta)}) ya pasó, así que ${nombreMes(p.corridos.de)} está cerrado: queda solo lo entregado${p.corridos.sgr ? ` y ${num(p.corridos.sgr)} SGR por entregar (${gsCorto(p.corridos.monto)}) pasan a ${nombreMes(p.corridos.a)}` : ""}.`
+      : !p.hastaPorDefecto ? (p.corridos.sgr
+        ? `Con la fecha de corte al ${fecha(p.hasta)}, ${num(p.corridos.sgr)} SGR (${gsCorto(p.corridos.monto)}) ${p.corridos.sgr === 1 ? "estimado para después de esa fecha pasa" : "estimados para después de esa fecha pasan"} de ${nombreMes(p.corridos.de)} a ${nombreMes(p.corridos.a)}.`
+        : `Con la fecha de corte al ${fecha(p.hasta)} ningún SGR cambia de mes.`) : "",
     `En ${nombreMesLargo(actual)} se proyectan ${gsCorto(tot(mesActual))}: ${gsCorto(mesActual.desa.entregado + mesActual.test.entregado)} ya entregados (${num(mesActual.entregados)} SGR) y ${gsCorto(mesActual.desa.proyectado + mesActual.test.proyectado)} por entregar (${num(mesActual.proyectados)} SGR).`,
     `Hasta diciembre suman ${gsCorto(totalAnio)}; el año siguiente acumula ${gsCorto(tot(siguiente))} en ${num(siguiente.proyectados)} SGR.`,
     venc ? `${num(p.vencidos.sgr)} SGR con la fecha vencida y sin entregar suman ${gsCorto(venc)}. No entran en ningún mes; si se entregaran este mes, el total de ${nombreMesLargo(actual)} llegaría a ${gsCorto(tot(mesActual) + venc)}.` : "",
@@ -82,7 +84,8 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
 
       <section className="banda">
         <Indicador nombre={`${MESES[+actual.slice(5, 7) - 1]} (mes en curso)`} valor={gsCorto(tot(mesActual))} nota={`${gsCorto(mesActual.desa.entregado + mesActual.test.entregado)} ya entregados`} />
-        <Indicador nombre="Por entregar hasta diciembre" valor={gsCorto(totalAnio - mesActual.desa.entregado - mesActual.test.entregado)} nota={`incluye ${MESES[+actual.slice(5, 7) - 1]}`} />
+        <Indicador nombre="Por entregar hasta diciembre" valor={gsCorto(totalAnio - mesActual.desa.entregado - mesActual.test.entregado)}
+          nota={p.mesCerrado && p.hasta.slice(0, 7) === actual ? `${MESES[+actual.slice(5, 7) - 1]} cerrado al ${fecha(p.hasta)}` : `incluye ${MESES[+actual.slice(5, 7) - 1]}`} />
         <Indicador nombre="Año siguiente" valor={gsCorto(tot(siguiente))} nota={`${num(siguiente.proyectados)} SGR`} />
         <Indicador nombre="Vencidos sin entregar" valor={gsCorto(venc)} nota={`${num(p.vencidos.sgr)} SGR, fuera de los meses`} />
         <Indicador nombre="Sin fecha vigente" valor={gsCorto(sinF)} nota={`${num(p.sinFecha.sgr)} SGR`} />
@@ -175,7 +178,9 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
                     {i.fecha ? fecha(i.fecha) : "–"}
                     <span className="debil"> {i.base === "fin_testing" ? "fin de testing" : "fin de desarrollo"}</span>
                     {i.estimada && <span className="etiqueta e-leve" style={{ marginLeft: 6 }}>Estimada</span>}
-                    {i.corrido && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }} title={`Posterior a la fecha de corte del mes (${fecha(p.hasta)})`}>Pasa al mes siguiente</span>}
+                    {i.corrido && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }}
+                      title={i.motivoCorrido === "mes_cerrado" ? `La fecha de corte del mes (${fecha(p.hasta)}) ya pasó y no se entregó` : `Posterior a la fecha de corte del mes (${fecha(p.hasta)})`}>
+                      {i.motivoCorrido === "mes_cerrado" ? "Pasa al mes siguiente: mes cerrado" : "Pasa al mes siguiente"}</span>}
                   </td>
                   <td className="n">{i.desa ? gs(i.desa) : "–"}</td>
                   <td className="n">{i.test ? gs(i.test) : "–"}</td>

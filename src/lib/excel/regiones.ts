@@ -526,7 +526,8 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
           lider: i.lider, tipo: i.tipo, fecha: i.fecha, base: i.base === "fin_testing" ? "Fin de testing" : "Fin de desarrollo",
           estimada: i.estimada ? "Sí" : "No", desa: i.desa, test: i.test, total: i.desa + i.test,
           origen: i.origen === "implementado" ? "Implementado" : "En curso",
-          desestimado: i.desestimado ? "Sí" : "No", descuento: i.descuento, corrido: i.corrido ? "Sí" : "No",
+          desestimado: i.desestimado ? "Sí" : "No", descuento: i.descuento,
+          corrido: i.corrido ? (i.motivoCorrido === "mes_cerrado" ? "Sí, mes cerrado" : "Sí, posterior al corte") : "No",
         })),
       });
     } },

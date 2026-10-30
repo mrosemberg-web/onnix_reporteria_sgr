@@ -46,8 +46,10 @@ export type ItemProyeccion = {
   desestimado: boolean;
   /** Presupuesto × tarifa menos el importe de la planilla, si es positivo. */
   descuento: number | null;
-  /** Pasó al mes siguiente porque su fecha es posterior a la fecha de corte del mes. */
+  /** Pasó al mes siguiente por la fecha de corte del mes. */
   corrido: boolean;
+  /** posterior: su fecha es posterior al corte. mes_cerrado: el corte ya pasó y no se entregó. */
+  motivoCorrido?: "posterior" | "mes_cerrado";
 };
 
 const escenarioDe = (desa: number, test: number): Escenario | null =>
@@ -115,8 +117,10 @@ function mesSiguiente(mes: string) {
 }
 
 /**
- * hasta: fecha de corte del mes. Lo que se estima entregar en el mismo mes pero
- * después de esa fecha pasa al mes siguiente. Por defecto, el último día del mes en curso.
+ * hasta: fecha de corte del mes. Por defecto, el último día del mes en curso.
+ *  - Lo que se estima entregar en ese mes pero después del corte pasa al mes siguiente.
+ *  - Si el corte ya pasó (hoy es posterior), el mes está cerrado: lo que quedó por entregar
+ *    en ese mes también pasa al siguiente. Lo ya entregado queda en el mes.
  */
 export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: { hasta?: string } = {}) {
   const datos = await cargarSeguimiento();
@@ -166,8 +170,11 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
   const hasta = hastaPedido && /^\d{4}-\d{2}-\d{2}$/.test(hastaPedido) && hastaPedido >= inicioMes && hastaPedido <= finAnio
     ? hastaPedido : finDeMes(corte.slice(0, 7));
   const mesHasta = hasta.slice(0, 7);
+  const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: process.env.APP_TZ || "America/Asuncion" }).format(new Date());
+  const mesCerrado = hasta < hoy;
   for (const i of enCurso) {
-    if (i.destino === "proyectado" && i.mes === mesHasta && i.fecha && i.fecha > hasta) {
+    if (i.destino === "proyectado" && i.mes === mesHasta && i.fecha && (mesCerrado || i.fecha > hasta)) {
+      i.motivoCorrido = i.fecha > hasta ? "posterior" : "mes_cerrado";
       const sig = mesSiguiente(mesHasta);
       i.mes = +sig.slice(0, 4) > anioCorte ? "siguiente" : sig;
       i.corrido = true;
@@ -197,7 +204,7 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
   return {
     corte, anioCorte, meses, columnas, matriz, vencidos: bloque("vencido"), sinFecha: bloque("sin_fecha"), items,
     cargas: datos.cargas, analisis: datos.analisis,
-    hasta, hastaPorDefecto: hasta === finDeMes(corte.slice(0, 7)), limites: { min: inicioMes, max: finAnio },
+    hasta, hastaPorDefecto: hasta === finDeMes(corte.slice(0, 7)), limites: { min: inicioMes, max: finAnio }, mesCerrado, hoy,
     corridos: { sgr: corridos.length, monto: corridos.reduce((s, i) => s + i.desa + i.test, 0), de: mesHasta, a: mesSiguiente(mesHasta) },
   };
 }

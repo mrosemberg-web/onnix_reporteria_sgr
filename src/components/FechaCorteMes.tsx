@@ -28,7 +28,8 @@ export function FechaCorteMes({ valor, min, max, porDefecto }: { valor: string; 
       </label>
       <button type="submit" className="boton" disabled={pendiente || fecha === valor}>Aplicar</button>
       {!porDefecto && <button type="button" className="boton sec" onClick={() => { aplicar(null); }}>Fin de mes</button>}
-      <span className="debil">Lo estimado para después de esta fecha, dentro del mismo mes, pasa al mes siguiente.</span>
+      <span className="debil">Lo estimado para después de esta fecha, dentro del mismo mes, pasa al mes siguiente. Si la fecha ya pasó, el mes
+        queda cerrado: solo cuenta lo entregado y lo pendiente pasa al mes siguiente.</span>
     </form>
   );
 }
