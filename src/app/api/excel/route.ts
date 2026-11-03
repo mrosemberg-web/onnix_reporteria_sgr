@@ -3,6 +3,7 @@ import { obtenerSesion } from "@/lib/auth";
 import { generarLibro } from "@/lib/excel/libro";
 import { paginaExcel } from "@/lib/excel/regiones";
 import { desdeUrl } from "@/lib/filtros";
+import { seccionDeRuta } from "@/lib/secciones";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest) {
   if (!sesion) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const params = new URLSearchParams(req.nextUrl.searchParams);
   const ruta = params.get("ruta") ?? "/";
+  if (!sesion.secciones.includes(seccionDeRuta(ruta))) return NextResponse.json({ error: "Sin acceso a esta sección" }, { status: 403 });
   const region = params.get("region");
   params.delete("ruta");
   params.delete("region");

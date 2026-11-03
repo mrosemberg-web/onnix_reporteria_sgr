@@ -22,7 +22,9 @@ function celda(v: unknown) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await obtenerSesion())) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const sesion = await obtenerSesion();
+  if (!sesion) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  if (!sesion.secciones.includes("implementados")) return NextResponse.json({ error: "Sin acceso a esta sección" }, { status: 403 });
   const op = await opciones();
   const f = leerFiltros(desdeUrl(req.nextUrl.searchParams), op.anios);
   const filas = await detalle(f);

@@ -2,7 +2,7 @@ import { TituloRegion } from "./BotonExcel";
 import { BarrasApiladasH } from "./graficos";
 import { EncabezadoSeguimiento, LeyendaCausas, SinSeguimiento, TablaSgr } from "./seguimiento-ui";
 import { Indicador, Lectura } from "./ui";
-import { requerirSesion } from "@/lib/auth";
+import { requerirSeccion } from "@/lib/auth";
 import type { SearchParams } from "@/lib/filtros";
 import { dias, horas, num, pct } from "@/lib/formato";
 import { lecturaSeguimiento } from "@/lib/lectura-seguimiento";
@@ -22,7 +22,7 @@ const TEXTO = {
 const ORDEN_SITUACION = { atrasado: 0, vence_pronto: 1, en_plazo: 2, fin_tarde: 3, replanificacion: 4, sin_plan: 5, fin_a_tiempo: 6, sin_asignacion: 7 };
 
 export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" | "test"; searchParams: Promise<SearchParams> }) {
-  const sesion = await requerirSesion();
+  const sesion = await requerirSeccion("en_curso");
   const [{ analisis, cargas, corte }, sp] = await Promise.all([cargarSeguimiento(), searchParams]);
   const deFase = analisis.filter((a) => a.fase === fz);
   if (!deFase.length) return <SinSeguimiento esAdmin={sesion.rol === "admin"} />;

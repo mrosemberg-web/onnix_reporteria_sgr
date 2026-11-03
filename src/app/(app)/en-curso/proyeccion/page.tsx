@@ -3,7 +3,7 @@ import { FechaCorteMes } from "@/components/FechaCorteMes";
 import { BarrasAcumulado } from "@/components/graficos";
 import { EncabezadoSeguimiento, SinSeguimiento } from "@/components/seguimiento-ui";
 import { Indicador, Lectura } from "@/components/ui";
-import { requerirSesion } from "@/lib/auth";
+import { requerirSeccion } from "@/lib/auth";
 import type { SearchParams } from "@/lib/filtros";
 import { fecha, gs, gsCorto, MESES, MESES_LARGOS, num, pct } from "@/lib/formato";
 import { ESCENARIOS, proyeccion, TARIFA_TEST_HORA, type ItemProyeccion } from "@/lib/proyeccion";
@@ -18,7 +18,7 @@ const nombreCol = (c: string, actual: string) =>
 const ORDEN = { entregado: 0, proyectado: 1, vencido: 2, sin_fecha: 3 };
 
 export default async function Proyeccion({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const sesion = await requerirSesion();
+  const sesion = await requerirSeccion("implementados");
   const sp = await searchParams;
   const f = { ...leerFiltrosSeguimiento(sp), fases: [], etapas: [], situaciones: [] };
   const p = await proyeccion(f, { hasta: Array.isArray(sp.hasta) ? sp.hasta[0] : sp.hasta });

@@ -334,3 +334,11 @@ td.nombre { white-space: nowrap; }
 .traslado { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .traslado input[type="text"] { width: 120px; min-height: 28px; padding: 3px 8px; font-size: 0.8rem; }
 .traslado button { font: inherit; font-size: 0.8rem; padding: 4px 10px; border-radius: var(--r-chico); border: 1px solid var(--linea); background: var(--superficie); color: var(--desa); cursor: pointer; white-space: nowrap; }
+
+/* Acceso por sección ---------------------------------------------------- */
+.secciones-campo { border: 1px solid var(--linea); border-radius: var(--r-chico); padding: 8px 12px 10px; display: flex; gap: 18px; flex-wrap: wrap; margin: 0; }
+.secciones-campo legend { font-size: 0.88rem; color: var(--tinta-2); padding: 0 4px; }
+.secciones-campo label, .editor-secciones label { display: inline-flex !important; gap: 6px; align-items: center; color: var(--tinta); font-size: 0.88rem; }
+.secciones-campo input, .editor-secciones input { width: auto !important; }
+.editor-secciones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.editor-secciones button { font: inherit; font-size: 0.8rem; padding: 3px 10px; border-radius: var(--r-chico); border: 1px solid var(--linea); background: var(--superficie); color: var(--desa); cursor: pointer; }

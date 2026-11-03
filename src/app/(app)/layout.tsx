@@ -17,7 +17,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           <span>Servicio de desarrollo y testing</span>
         </div>
         <Suspense>
-          <Nav esAdmin={s.rol === "admin"} />
+          <Nav esAdmin={s.rol === "admin"} secciones={s.secciones} />
         </Suspense>
         <div className="lateral-pie">
           <span>{s.nombre}</span>

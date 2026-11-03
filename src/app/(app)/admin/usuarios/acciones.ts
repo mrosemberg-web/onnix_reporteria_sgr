@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { nuevoToken, requerirAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { seccionesValidas, TODAS } from "@/lib/secciones";
 
 export type EstadoInvitacion = { error?: string; enlace?: string; vence?: string };
 
@@ -21,13 +22,29 @@ export async function crearInvitacion(_: EstadoInvitacion, fd: FormData): Promis
   const rol = fd.get("rol") === "admin" ? "admin" : "lector";
   const nota = String(fd.get("nota") ?? "").trim().slice(0, 120) || null;
   const dias = Math.min(Math.max(Number(fd.get("dias")) || 7, 1), 30);
+  // Los administradores ven todo; para consulta, al menos una sección.
+  const secciones = rol === "admin" ? TODAS : seccionesValidas(fd.getAll("secciones"));
+  if (!secciones.length) return { error: "Elegí al menos una sección a la que tendrá acceso." };
   const { token, hash } = nuevoToken();
   const [inv] = await sql<{ expira_en: Date }[]>`
-    insert into invitaciones (token_hash, rol, nota, creada_por, expira_en)
-    values (${hash}, ${rol}, ${nota}, ${s.uid}, now() + make_interval(days => ${dias}))
+    insert into invitaciones (token_hash, rol, nota, creada_por, expira_en, secciones)
+    values (${hash}, ${rol}, ${nota}, ${s.uid}, now() + make_interval(days => ${dias}), ${secciones})
     returning expira_en`;
   revalidatePath("/admin/usuarios");
   return { enlace: `${await origen()}/invitacion/${token}`, vence: inv.expira_en.toISOString() };
+}
+
+export type EstadoSecciones = { error?: string; ok?: string };
+
+/** Cambia las secciones que puede ver un usuario de consulta. */
+export async function cambiarSecciones(_: EstadoSecciones, fd: FormData): Promise<EstadoSecciones> {
+  await requerirAdmin();
+  const id = Number(fd.get("id"));
+  const secciones = seccionesValidas(fd.getAll("secciones"));
+  if (!secciones.length) return { error: "Tiene que quedar al menos una sección." };
+  await sql`update usuarios set secciones = ${secciones} where id = ${id} and rol = 'lector'`;
+  revalidatePath("/admin/usuarios");
+  return { ok: "Guardado." };
 }
 
 export async function revocarInvitacion(fd: FormData) {

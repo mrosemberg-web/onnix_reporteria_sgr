@@ -1,7 +1,7 @@
 import { BotonExcel } from "@/components/BotonExcel";
 import { LineaTiempo } from "@/components/graficos";
 import { ChipEtapa, ChipSituacion, EncabezadoSeguimiento, SinSeguimiento } from "@/components/seguimiento-ui";
-import { requerirSesion } from "@/lib/auth";
+import { requerirSeccion } from "@/lib/auth";
 import type { SearchParams } from "@/lib/filtros";
 import { fecha, horas, num } from "@/lib/formato";
 import { aplicarFiltros, cargarSeguimiento, leerFiltrosSeguimiento, opcionesSeguimiento } from "@/lib/seguimiento";
@@ -14,7 +14,7 @@ const ORDEN = { atrasado: 0, vence_pronto: 1, en_plazo: 2, replanificacion: 3, s
 const FASE = { desa: "Desarrollo", test: "Testing" } as const;
 
 export default async function Tablero({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const sesion = await requerirSesion();
+  const sesion = await requerirSeccion("en_curso");
   const [{ analisis, cargas, corte }, sp] = await Promise.all([cargarSeguimiento(), searchParams]);
   if (!analisis.length) return <SinSeguimiento esAdmin={sesion.rol === "admin"} />;
   const f = leerFiltrosSeguimiento(sp);

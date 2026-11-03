@@ -91,6 +91,7 @@ Ya están cargados 2025 y 2026 con sus traslados y extraordinarios, y 2027 en su
   - *Consulta*: solo reportes.
 - **Invitaciones.** El administrador genera un enlace de invitación con perfil y vencimiento de 1 a 30 días, y la persona elige su usuario y clave. Cada enlace sirve una sola vez, se puede revocar y en la base solo se guarda su hash.
 - **Claves olvidadas.** El administrador genera una clave temporal, que se muestra una sola vez. Cada usuario puede cambiar su clave en *Mi cuenta*.
+- **Acceso por sección**: cada usuario de consulta puede ver **Implementados**, **En curso** o ambas. Se elige al invitar y se cambia después desde Usuarios; siempre tiene que quedar al menos una. Los administradores ven todo. La restricción aplica al menú, a las páginas y a las exportaciones (Excel y CSV): una página de una sección sin permiso redirige a la primera sección habilitada, y la exportación responde 403. **Proyección de entregas** está en el menú de Implementados y depende de ese permiso, aunque use las planillas en curso.
 
 ## Carga de la planilla
 

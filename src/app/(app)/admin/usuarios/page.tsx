@@ -2,7 +2,8 @@ import { requerirAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { fechaHora } from "@/lib/formato";
 import { cambiarActivo, cambiarRol, revocarInvitacion } from "./acciones";
-import { BotonClaveTemporal, FormNuevaInvitacion } from "./Cliente";
+import { BotonClaveTemporal, EditorSecciones, FormNuevaInvitacion } from "./Cliente";
+import { nombreSeccion } from "@/lib/secciones";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Usuarios" };
@@ -10,11 +11,11 @@ export const metadata = { title: "Usuarios" };
 export default async function Usuarios() {
   const s = await requerirAdmin();
   const [usuarios, invitaciones] = await Promise.all([
-    sql<{ id: number; usuario: string; nombre: string; rol: string; activo: boolean; ultimo_acceso: Date | null; bloqueado: boolean }[]>`
-      select id, usuario, nombre, rol, activo, ultimo_acceso, coalesce(bloqueado_hasta > now(), false) as bloqueado
+    sql<{ id: number; usuario: string; nombre: string; rol: string; activo: boolean; ultimo_acceso: Date | null; bloqueado: boolean; secciones: string[] }[]>`
+      select id, usuario, nombre, rol, activo, ultimo_acceso, coalesce(bloqueado_hasta > now(), false) as bloqueado, secciones
       from usuarios order by activo desc, nombre`,
-    sql<{ id: number; rol: string; nota: string | null; creada_en: Date; expira_en: Date; creador: string | null }[]>`
-      select i.id, i.rol, i.nota, i.creada_en, i.expira_en, u.nombre as creador
+    sql<{ id: number; rol: string; nota: string | null; creada_en: Date; expira_en: Date; creador: string | null; secciones: string[] }[]>`
+      select i.id, i.rol, i.nota, i.creada_en, i.expira_en, u.nombre as creador, i.secciones
       from invitaciones i left join usuarios u on u.id = i.creada_por
       where i.usada_en is null and not i.revocada and i.expira_en > now() order by i.creada_en desc`,
   ]);
@@ -43,7 +44,7 @@ export default async function Usuarios() {
                 {invitaciones.map((i) => (
                   <tr key={i.id}>
                     <td>{i.nota ?? <span className="debil">Sin nota</span>}</td>
-                    <td>{i.rol === "admin" ? "Administrador" : "Consulta"}</td>
+                    <td>{i.rol === "admin" ? "Administrador" : `Consulta: ${i.secciones.map(nombreSeccion).join(" y ")}`}</td>
                     <td>{fechaHora(i.creada_en)}</td>
                     <td>{fechaHora(i.expira_en)}</td>
                     <td>{i.creador ?? "–"}</td>
@@ -62,7 +63,7 @@ export default async function Usuarios() {
         <h2>Usuarios</h2>
         <div className="tabla-env">
           <table>
-            <thead><tr><th>Nombre</th><th>Usuario</th><th>Perfil</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Usuario</th><th>Perfil</th><th>Secciones</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
             <tbody>
               {usuarios.map((u) => {
                 const yo = u.id === s.uid;
@@ -71,6 +72,7 @@ export default async function Usuarios() {
                     <td>{u.nombre}{yo && <span className="debil"> (vos)</span>}</td>
                     <td>{u.usuario}</td>
                     <td>{u.rol === "admin" ? "Administrador" : "Consulta"}</td>
+                    <td>{u.rol === "admin" ? <span className="debil">Todas</span> : <EditorSecciones id={u.id} secciones={u.secciones} />}</td>
                     <td>
                       {!u.activo ? <span className="etiqueta e-neutro">Inactivo</span>
                         : u.bloqueado ? <span className="etiqueta e-leve">Bloqueado 15 min</span>

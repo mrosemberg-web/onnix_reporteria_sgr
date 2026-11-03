@@ -2,6 +2,7 @@ import Link from "next/link";
 import { hashToken } from "@/lib/auth";
 import { asegurarConexion, sql } from "@/lib/db";
 import { fechaHora } from "@/lib/formato";
+import { nombreSeccion } from "@/lib/secciones";
 import { FormInvitacion } from "./FormInvitacion";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +12,8 @@ export const metadata = { title: "Invitación" };
 export default async function Invitacion({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   await asegurarConexion();
-  const [inv] = await sql<{ rol: string; expira_en: Date }[]>`
-    select rol, expira_en from invitaciones
+  const [inv] = await sql<{ rol: string; expira_en: Date; secciones: string[] }[]>`
+    select rol, expira_en, secciones from invitaciones
     where token_hash = ${hashToken(token)} and usada_en is null and not revocada and expira_en > now()`;
   return (
     <main className="acceso">
@@ -25,7 +26,7 @@ export default async function Invitacion({ params }: { params: Promise<{ token: 
           {inv ? (
             <>
               <p style={{ marginBottom: 16, color: "var(--tinta-2)" }}>
-                Vas a ingresar con perfil {inv.rol === "admin" ? "administrador" : "de consulta"}. El enlace vence el {fechaHora(inv.expira_en)}.
+                Vas a ingresar con perfil {inv.rol === "admin" ? "administrador" : `de consulta, con acceso a ${inv.secciones.map(nombreSeccion).join(" y ")}`}. El enlace vence el {fechaHora(inv.expira_en).replace(/\.$/, "")}.
               </p>
               <FormInvitacion token={token} />
             </>

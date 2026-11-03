@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createHash, randomBytes } from "node:crypto";
 import { asegurarConexion, sql } from "./db";
+import { inicioDe, seccionesValidas, TODAS, type Seccion } from "./secciones";
 import { COOKIE_SESION, DURACION_SESION_S, firmarSesion, verificarSesion, type Sesion } from "./token";
 
 export type { Sesion, Rol } from "./token";
@@ -22,20 +23,31 @@ export async function cerrarSesion() {
   (await cookies()).delete(COOKIE_SESION);
 }
 
-/** Lee la sesión y confirma contra la base que el usuario siga activo (y con su rol actual). */
-export async function obtenerSesion(): Promise<Sesion | null> {
+export type SesionActual = Sesion & { secciones: Seccion[] };
+
+/** Lee la sesión y confirma contra la base que el usuario siga activo (con su rol y secciones actuales). */
+export async function obtenerSesion(): Promise<SesionActual | null> {
   const s = await verificarSesion((await cookies()).get(COOKIE_SESION)?.value);
   if (!s) return null;
   await asegurarConexion();
-  const [u] = await sql<{ id: number; usuario: string; nombre: string; rol: "admin" | "lector"; activo: boolean }[]>`
-    select id, usuario, nombre, rol, activo from usuarios where id = ${s.uid}`;
+  const [u] = await sql<{ id: number; usuario: string; nombre: string; rol: "admin" | "lector"; activo: boolean; secciones: string[] }[]>`
+    select id, usuario, nombre, rol, activo, secciones from usuarios where id = ${s.uid}`;
   if (!u || !u.activo) return null;
-  return { uid: u.id, usuario: u.usuario, nombre: u.nombre, rol: u.rol };
+  // Los administradores ven todas las secciones.
+  const secciones = u.rol === "admin" ? TODAS : seccionesValidas(u.secciones);
+  return { uid: u.id, usuario: u.usuario, nombre: u.nombre, rol: u.rol, secciones };
 }
 
 export async function requerirSesion() {
   const s = await obtenerSesion();
   if (!s) redirect("/login");
+  return s;
+}
+
+/** Exige acceso a una sección; si no lo tiene, lo lleva a la primera sección que sí puede ver. */
+export async function requerirSeccion(seccion: Seccion) {
+  const s = await requerirSesion();
+  if (!s.secciones.includes(seccion)) redirect(inicioDe(s.secciones));
   return s;
 }
 

@@ -1,4 +1,5 @@
 import { requerirSesion } from "@/lib/auth";
+import { nombreSeccion } from "@/lib/secciones";
 import { FormClave } from "./FormClave";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ export default async function Cuenta() {
       <header className="encabezado">
         <div>
           <h1>Mi cuenta</h1>
-          <p>{s.nombre}, usuario «{s.usuario}», perfil {s.rol === "admin" ? "administrador" : "de consulta"}.</p>
+          <p>{s.nombre}, usuario «{s.usuario}», perfil {s.rol === "admin" ? "administrador" : "de consulta"}.
+            Acceso a: {s.secciones.map(nombreSeccion).join(" y ")}.</p>
         </div>
       </header>
       <section className="panel" style={{ maxWidth: 520 }}>

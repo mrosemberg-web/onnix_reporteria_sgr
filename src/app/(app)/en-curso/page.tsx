@@ -2,7 +2,7 @@ import { TituloRegion } from "@/components/BotonExcel";
 import { BarrasApiladasH, DispersionAvance } from "@/components/graficos";
 import { EncabezadoSeguimiento, LeyendaCausas, SinSeguimiento, TablaSgr } from "@/components/seguimiento-ui";
 import { Indicador, Lectura } from "@/components/ui";
-import { requerirSesion } from "@/lib/auth";
+import { requerirSeccion } from "@/lib/auth";
 import type { SearchParams } from "@/lib/filtros";
 import { dias, fecha, gsCorto, horas, num, pct } from "@/lib/formato";
 import { lecturaSeguimiento } from "@/lib/lectura-seguimiento";
@@ -17,7 +17,7 @@ export const metadata = { title: "En curso" };
 const FASE = { desa: "Desarrollo", test: "Testing" } as const;
 
 export default async function EnCurso({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const sesion = await requerirSesion();
+  const sesion = await requerirSeccion("en_curso");
   const [{ analisis, cargas, corte }, sp] = await Promise.all([cargarSeguimiento(), searchParams]);
   if (!analisis.length) return <SinSeguimiento esAdmin={sesion.rol === "admin"} />;
   const f = leerFiltrosSeguimiento(sp);

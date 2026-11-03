@@ -23,16 +23,16 @@ export async function aceptarInvitacion(prev: EstadoInvitacion, fd: FormData): P
   await asegurarConexion();
   const hash = await bcrypt.hash(clave, 12);
   const resultado = await transaccion(async (tx) => {
-    const [inv] = await tx<{ id: number; rol: "admin" | "lector" }[]>`
-      select id, rol from invitaciones
+    const [inv] = await tx<{ id: number; rol: "admin" | "lector"; secciones: string[] }[]>`
+      select id, rol, secciones from invitaciones
       where token_hash = ${hashToken(token)} and usada_en is null and not revocada and expira_en > now()
       for update`;
     if (!inv) return { error: "La invitación ya se usó, venció o fue revocada. Pedí un enlace nuevo." } as const;
     const [existe] = await tx`select 1 from usuarios where lower(usuario) = lower(${usuario})`;
     if (existe) return { error: "Ese usuario ya está en uso. Elegí otro." } as const;
     const [u] = await tx<{ id: number }[]>`
-      insert into usuarios (usuario, nombre, clave_hash, rol, ultimo_acceso)
-      values (${usuario}, ${nombre}, ${hash}, ${inv.rol}, now()) returning id`;
+      insert into usuarios (usuario, nombre, clave_hash, rol, ultimo_acceso, secciones)
+      values (${usuario}, ${nombre}, ${hash}, ${inv.rol}, now(), ${inv.secciones}) returning id`;
     await tx`update invitaciones set usada_en = now(), usada_por = ${u.id} where id = ${inv.id}`;
     return { ok: { uid: u.id, rol: inv.rol } } as const;
   });

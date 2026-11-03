@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
-import { claveTemporal, crearInvitacion, type EstadoInvitacion, type EstadoTemporal } from "./acciones";
+import { cambiarSecciones, claveTemporal, crearInvitacion, type EstadoInvitacion, type EstadoSecciones, type EstadoTemporal } from "./acciones";
+import { SECCIONES } from "@/lib/secciones";
 
 function Copiar({ texto }: { texto: string }) {
   const [copiado, setCopiado] = useState(false);
@@ -18,11 +19,12 @@ function Copiar({ texto }: { texto: string }) {
 
 export function FormNuevaInvitacion() {
   const [estado, accion, pendiente] = useActionState<EstadoInvitacion, FormData>(crearInvitacion, {});
+  const [rol, setRol] = useState("lector");
   return (
     <form action={accion} className="form" style={{ maxWidth: 560 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <label>Perfil
-          <select name="rol" defaultValue="lector">
+          <select name="rol" value={rol} onChange={(e) => setRol(e.target.value)}>
             <option value="lector">Consulta (solo reportes)</option>
             <option value="admin">Administrador</option>
           </select>
@@ -33,6 +35,12 @@ export function FormNuevaInvitacion() {
           </select>
         </label>
       </div>
+      <fieldset className="secciones-campo">
+        <legend>Secciones a las que tendrá acceso</legend>
+        {rol === "admin" ? <span className="debil">Los administradores ven todas las secciones.</span> : SECCIONES.map((s) => (
+          <label key={s.clave}><input type="checkbox" name="secciones" value={s.clave} defaultChecked /> {s.nombre}</label>
+        ))}
+      </fieldset>
       <label>Para quién (opcional)<input type="text" name="nota" placeholder="Ej.: Gerencia de Operaciones del cliente" maxLength={120} /></label>
       <div><button className="boton" type="submit" disabled={pendiente}>Generar enlace de invitación</button></div>
       {estado.enlace && (
@@ -54,6 +62,22 @@ export function BotonClaveTemporal({ id }: { id: number }) {
       <input type="hidden" name="id" value={id} />
       <button type="submit" disabled={pendiente}>Clave temporal</button>
       {estado.error && <span className="debil"> {estado.error}</span>}
+    </form>
+  );
+}
+
+/** Casillas de secciones de un usuario de consulta, con guardado en el lugar. */
+export function EditorSecciones({ id, secciones }: { id: number; secciones: string[] }) {
+  const [estado, accion, pendiente] = useActionState<EstadoSecciones, FormData>(cambiarSecciones, {});
+  return (
+    <form action={accion} className="editor-secciones">
+      <input type="hidden" name="id" value={id} />
+      {SECCIONES.map((s) => (
+        <label key={s.clave}><input type="checkbox" name="secciones" value={s.clave} defaultChecked={secciones.includes(s.clave)} /> {s.nombre}</label>
+      ))}
+      <button type="submit" disabled={pendiente}>Guardar</button>
+      {estado.error && <span className="aviso error" style={{ padding: "2px 8px" }}>{estado.error}</span>}
+      {estado.ok && <span className="debil">{estado.ok}</span>}
     </form>
   );
 }

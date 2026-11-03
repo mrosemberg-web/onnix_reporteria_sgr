@@ -15,13 +15,13 @@ const REPORTES: Item[] = [
   { href: "/desglose", texto: "Por área y tipo", claves: HISTORICO },
   { href: "/facturacion", texto: "Facturación", claves: HISTORICO },
   { href: "/requerimientos", texto: "Requerimientos", claves: HISTORICO },
+  { href: "/en-curso/proyeccion", texto: "Proyección de entregas", claves: ["lider", "persona", "tservicio", "hasta"] },
 ];
 const CURSO: Item[] = [
   { href: "/en-curso", texto: "Resumen en curso", claves: EN_CURSO },
   { href: "/en-curso/desarrollo", texto: "Desarrollo en curso", claves: EN_CURSO },
   { href: "/en-curso/testing", texto: "Testing en curso", claves: EN_CURSO },
   { href: "/en-curso/equipo", texto: "Tablero del equipo", claves: EN_CURSO },
-  { href: "/en-curso/proyeccion", texto: "Proyección de entregas", claves: ["lider", "persona", "tservicio", "hasta"] },
 ];
 const ADMIN: Item[] = [
   { href: "/admin/carga", texto: "Cargar planillas" },
@@ -29,7 +29,7 @@ const ADMIN: Item[] = [
   { href: "/admin/usuarios", texto: "Usuarios" },
 ];
 
-export function Nav({ esAdmin }: { esAdmin: boolean }) {
+export function Nav({ esAdmin, secciones }: { esAdmin: boolean; secciones: string[] }) {
   const ruta = usePathname();
   const sp = useSearchParams();
   // Conserva los filtros al moverse entre pantallas de la misma sección.
@@ -45,10 +45,18 @@ export function Nav({ esAdmin }: { esAdmin: boolean }) {
   };
   return (
     <nav className="nav" aria-label="Secciones">
-      <span className="nav-grupo">Implementados</span>
-      {REPORTES.map(enlace)}
-      <span className="nav-grupo">En curso</span>
-      {CURSO.map(enlace)}
+      {secciones.includes("implementados") && (
+        <>
+          <span className="nav-grupo">Implementados</span>
+          {REPORTES.map(enlace)}
+        </>
+      )}
+      {secciones.includes("en_curso") && (
+        <>
+          <span className="nav-grupo">En curso</span>
+          {CURSO.map(enlace)}
+        </>
+      )}
       {esAdmin && (
         <>
           <span className="nav-grupo">Administración</span>
