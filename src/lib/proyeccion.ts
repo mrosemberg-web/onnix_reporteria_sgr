@@ -23,7 +23,7 @@ export const ESCENARIOS: Record<Escenario, string> = {
   3: "Solo testing (desarrollo del cliente)",
 };
 
-export type Destino = "entregado" | "proyectado" | "vencido" | "sin_fecha";
+export type Destino = "entregado" | "entregado_antes" | "proyectado" | "vencido" | "no_iniciado" | "sin_fecha";
 
 export type ItemProyeccion = {
   id_req: string;
@@ -80,8 +80,11 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
   if (finalizado && a.fase === fasePropia) {
     const f = a.fecha_estado;
     if (f && f.slice(0, 7) === mesCorte && f <= corte) return { ...comun, fecha: f, estimada: false, destino: "entregado", mes: mesCorte };
-    return null; // entregado en un mes anterior: no entra en la proyección
+    // Entregado en un mes anterior pero todavía en la planilla (sin implementar): fuera de los meses, aparte.
+    return { ...comun, fecha: f, estimada: false, destino: "entregado_antes", mes: null };
   }
+  // Sin fecha de inicio no hay entrega estimada: queda aparte como «no iniciado».
+  if (!a.iniciado) return { ...comun, fecha: null, estimada: false, destino: "no_iniciado", mes: null };
   if (a.situacion === "replanificacion") return { ...comun, fecha: null, estimada: false, destino: "sin_fecha", mes: null };
 
   // Fecha que manda.
@@ -128,9 +131,18 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
   const anioCorte = +corte.slice(0, 4);
   const inicioMes = `${corte.slice(0, 7)}-01`;
 
-  const enCurso = aplicarFiltros(datos.analisis, { ...f, etapas: [], situaciones: [] })
+  // Un SGR que figura en las dos planillas (desarrollo y testing) se cuenta una sola vez: manda la de testing.
+  const filtrados = aplicarFiltros(datos.analisis, { ...f, etapas: [], situaciones: [] }).filter((a) => a.etapa !== "sin_asignacion");
+  const enTesting = new Set(filtrados.filter((a) => a.fase === "test").map((a) => a.id_req));
+  const repetidos = filtrados.filter((a) => a.fase === "desa" && enTesting.has(a.id_req));
+  const enCurso = filtrados
+    .filter((a) => !(a.fase === "desa" && enTesting.has(a.id_req)))
     .map((a) => desdeEnCurso(a, corte, anioCorte, datos.feriados))
     .filter((x): x is ItemProyeccion => x != null);
+
+  // Conciliación contra las planillas en curso (con los mismos filtros).
+  const importe = (l: typeof filtrados) => l.reduce((s, a) => s + (a.importe_total ?? 0), 0);
+  const planillaDesa = filtrados.filter((a) => a.fase === "desa"), planillaTest = filtrados.filter((a) => a.fase === "test");
 
   // Implementados cuya fecha que manda cayó en el mes actual (hasta la fecha de corte).
   const historicos = await sql<FilaHistorica[]>`
@@ -201,8 +213,18 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
   });
   const bloque = (d: Destino) => { const l = celda(d); return { sgr: l.length, desa: suma(l, "desa"), test: suma(l, "test") }; };
   const corridos = enCurso.filter((i) => i.corrido);
+  const montoItems = (l: ItemProyeccion[]) => l.reduce((s, i) => s + i.desa + i.test, 0);
+  const conciliacion = {
+    planillaDesa: { sgr: planillaDesa.length, monto: importe(planillaDesa) },
+    planillaTest: { sgr: planillaTest.length, monto: importe(planillaTest) },
+    repetidos: { sgr: repetidos.length, monto: importe(repetidos) },
+    sinImporte: { sgr: filtrados.filter((a) => !(a.fase === "desa" && enTesting.has(a.id_req)) && (a.importe_desa ?? 0) + (a.importe_test ?? 0) === 0).length, monto: 0 },
+    implementados: { sgr: implementados.length, monto: montoItems(implementados) },
+    total: { sgr: items.length, monto: montoItems(items) },
+  };
   return {
-    corte, anioCorte, meses, columnas, matriz, vencidos: bloque("vencido"), sinFecha: bloque("sin_fecha"), items,
+    corte, anioCorte, meses, columnas, matriz, vencidos: bloque("vencido"), noIniciados: bloque("no_iniciado"), sinFecha: bloque("sin_fecha"),
+    entregadosAntes: bloque("entregado_antes"), conciliacion, items,
     cargas: datos.cargas, analisis: datos.analisis,
     hasta, hastaPorDefecto: hasta === finDeMes(corte.slice(0, 7)), limites: { min: inicioMes, max: finAnio }, mesCerrado, hoy,
     corridos: { sgr: corridos.length, monto: corridos.reduce((s, i) => s + i.desa + i.test, 0), de: mesHasta, a: mesSiguiente(mesHasta) },

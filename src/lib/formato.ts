@@ -26,7 +26,6 @@ export function gs(n: number | null | undefined) {
 /** Guaraníes abreviados en millones (M) para KPIs. */
 export function gsCorto(n: number | null | undefined) {
   if (n === null || n === undefined) return "–";
-  if (Math.abs(n) >= 1e9) return `Gs. ${num(n / 1e9, 2)} mil M`;
   if (Math.abs(n) >= 1e6) return `Gs. ${num(n / 1e6, 1)} M`;
   return gs(n);
 }

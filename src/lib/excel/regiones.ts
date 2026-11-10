@@ -276,12 +276,12 @@ const colsDetalleSeg = cols(
   ["desarrollador", "Desarrollador (testing)", "texto"], ["dev_cliente", "Desarrollo del cliente", "texto"],
   ["usuario", "Usuario", "texto"], ["lider", "Líder", "texto"], ["tservicio", "Tipo de servicio", "texto"], ["estado", "Estado", "texto"],
   ["etapa", "Etapa", "texto"], ["situacion", "Situación", "texto"], ["fecha_estado", "Fecha del estado", "fecha"],
-  ["dias_estado", "Días hábiles en el estado", "entero"], ["inicio", "Inicio", "fecha"], ["estimada", "Entrega estimada", "fecha"],
+  ["dias_estado", "Días hábiles en el estado", "entero"], ["iniciado", "Iniciado", "texto"], ["inicio", "Inicio", "fecha"], ["estimada", "Entrega estimada", "fecha"],
   ["corregida", "Entrega corregida por pausas", "fecha"], ["atraso", "Atraso (días hábiles)", "entero"], ["causa", "Causa principal", "texto"],
   ["c_pausas", "Pausas anteriores", "entero"], ["c_cliente", "Espera del cliente", "entero"], ["c_dev", "Devoluciones de testing", "entero"],
   ["c_pausa", "Pausa sin motivo", "entero"], ["c_ejec", "Ejecución", "entero"], ["diag", "Diagnóstico de ejecución", "texto"],
   ["devoluciones", "Devoluciones al desarrollador", "entero"], ["ayer", "Horas ayer", "horas"], ["trab", "Horas trabajadas", "horas"],
-  ["presu", "Horas presupuestadas", "horas"], ["consumo", "Horas usadas", "pct"], ["excedidas", "Horas excedidas", "horas"],
+  ["presu", "Horas presupuestadas", "horas"], ["antes_iniciar", "Horas antes de iniciar", "horas"], ["consumo", "Horas usadas", "pct"], ["excedidas", "Horas excedidas", "horas"],
   ["pausadas", "Horas pausadas de la fase", "horas"], ["otras", "Otras horas pausadas", "horas"],
   ["sin_registrar", "Días detenido sin pausa registrada", "entero"], ["importe", "Importe total (Gs.)", "gs"],
 );
@@ -289,7 +289,8 @@ const filaSeg = (a: Analisis) => ({
   sgr: a.id_req, fase: FASE[a.fase], asunto: a.asunto, responsable: a.nombre ?? a.usuario, usuario: a.usuario, lider: a.lider,
   desarrollador: a.fase === "test" ? a.devNombre : null, dev_cliente: a.fase === "test" && a.devNombre ? (a.devExterno ? "Sí" : "No") : null,
   tservicio: a.tipo_servicio, estado: a.estado, etapa: ETAPAS[a.etapa].nombre, situacion: SITUACIONES[a.situacion].nombre,
-  fecha_estado: a.fecha_estado, dias_estado: a.diasEnEstado, inicio: a.fecha_inicio, estimada: a.entrega_estimada, corregida: a.entregaCorregida,
+  fecha_estado: a.fecha_estado, dias_estado: a.diasEnEstado, iniciado: a.iniciado ? "Sí" : "No",
+  antes_iniciar: a.horasAntesDeIniciar || null, inicio: a.fecha_inicio, estimada: a.entrega_estimada, corregida: a.entregaCorregida,
   atraso: a.atraso, causa: a.causaPrincipal ? CAUSAS[a.causaPrincipal].nombre : null,
   c_pausas: a.atraso ? a.causas.pausas : null, c_cliente: a.atraso ? a.causas.cliente : null, c_dev: a.atraso ? a.causas.devoluciones : null,
   c_pausa: a.atraso ? a.causas.pausa : null, c_ejec: a.atraso ? a.causas.ejecucion : null,
@@ -344,9 +345,11 @@ function paginaEnCurso(items: Analisis[]): DefRegion[] {
     }) },
     { id: "esperando_cliente", titulo: "Esperando al cliente", construir: async () => una({
       id: "esperando_cliente", titulo: "Esperando al cliente",
-      columnas: cols(["sgr", "SGR", "texto"], ["asunto", "Asunto", "texto"], ["fase", "Fase", "texto"], ["responsable", "Responsable", "texto"],
-        ["estado", "Estado", "texto"], ["desde", "Desde", "fecha"], ["dias", "Días hábiles esperando", "entero"], ["atraso", "Atraso (días hábiles)", "entero"]),
-      filas: sgr.filter((a) => a.etapa === "cliente").sort((a, b) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0)).map((a) => ({
+      columnas: cols(["sgr", "SGR", "texto"], ["asunto", "Asunto", "texto"], ["situacion_inicio", "Situación", "texto"], ["fase", "Fase", "texto"],
+        ["responsable", "Responsable", "texto"], ["estado", "Estado", "texto"], ["desde", "Desde", "fecha"], ["dias", "Días hábiles esperando", "entero"], ["atraso", "Atraso (días hábiles)", "entero"]),
+      filas: [...sgr.filter((a) => a.etapa === "cliente").sort((a, b) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0)),
+              ...sgr.filter((a) => a.etapa === "cliente_sin_iniciar").sort((a, b) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0))].map((a) => ({
+        situacion_inicio: a.iniciado ? "Iniciado" : "Antes de iniciar",
         sgr: a.id_req, asunto: a.asunto, fase: FASE[a.fase], responsable: a.nombre ?? a.usuario, estado: a.estado, desde: a.fecha_estado,
         dias: a.diasEnEstado, atraso: a.atraso })),
     }) },
@@ -368,15 +371,16 @@ function paginaSeguimientoFase(fz: Fase, items: Analisis[], testing: Analisis[] 
     { id: "por_persona", titulo: `Por ${persona.toLowerCase()}`, construir: async () => una({
       id: "por_persona", titulo: `Por ${persona.toLowerCase()}`,
       columnas: cols(["persona", persona, "texto"], ["usuario", "Usuario", "texto"], ["lider", "Líder", "texto"], ["sgr", "SGR", "entero"],
-        ["activo", "En trabajo", "entero"], ["cliente", "Esperando al cliente", "entero"],
+        ["activo", "En trabajo", "entero"], ["cliente", "Esperando al cliente (iniciados)", "entero"], ["sin_iniciar", "Sin iniciar", "entero"],
         ...(fz === "test" ? [["devoluciones", "Devoluciones al desarrollador", "entero"] as [string, string, "entero"]] : []),
         ...(fz === "desa" ? [["recibidas", "Devoluciones recibidas de testing", "entero"] as [string, string, "entero"]] : []),
         ["atrasados", "Atrasados", "entero"], ["externo", "Atraso externo (cliente y pausas anteriores)", "entero"],
         ["por_dev", fz === "test" ? "Esperando corrección del desarrollador" : "Atraso por devoluciones", "entero"], ["pausa", "Pausa sin motivo", "entero"], ["ejec", "Atraso por ejecución", "entero"],
         ["ayer", "Horas ayer", "horas"], ["trab", "Horas trabajadas (con presupuesto)", "horas"], ["presu", "Horas presupuestadas", "horas"],
-        ["usadas", "Horas usadas", "pct"], ["excedidos", "SGR excedidos en horas", "entero"], ["sin_sgr", "Sin SGR asignado", "texto"]),
+        ["usadas", "Horas usadas", "pct"], ["antes_iniciar", "Horas antes de iniciar (aparte)", "horas"], ["excedidos", "SGR excedidos en horas", "entero"], ["sin_sgr", "Sin SGR asignado", "texto"]),
       filas: personas.map((p) => ({
         persona: p.nombre, usuario: p.usuario, lider: p.lider, sgr: p.r.sgr, activo: p.r.porEtapa.activo, cliente: p.r.esperandoCliente,
+        sin_iniciar: p.r.noIniciados, antes_iniciar: p.r.horasAntesDeIniciar,
         devoluciones: p.r.devoluciones, recibidas: devDe.get(p.usuario)?.devoluciones ?? 0, atrasados: p.r.atrasados,
         externo: p.r.causas.pausas + p.r.causas.cliente, por_dev: p.r.causas.devoluciones + (devDe.get(p.usuario)?.atraso ?? 0),
         pausa: p.r.causas.pausa, ejec: p.r.causas.ejecucion, ayer: p.r.horasAyer, trab: p.r.trabConPresu, presu: p.r.presuConTrab,
@@ -487,33 +491,60 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
       const columnas = [
         ...cols(["equipo", "Equipo", "texto"], ["concepto", "Concepto", "texto"]),
         ...p.columnas.map((c) => ({ clave: c, titulo: nombreCol(c) + (c === p.meses[0] ? " (en curso)" : ""), tipo: "gs" as const })),
-        ...cols(["total", "Total (Gs.)", "gs"], ["vencidos", "Vencidos sin entregar (Gs.)", "gs"], ["sin_fecha", "Sin fecha vigente (Gs.)", "gs"]),
+        ...cols(["total", "Total (Gs.)", "gs"], ["vencidos", "Vencidos sin entregar (Gs.)", "gs"], ["no_iniciados", "No iniciados (Gs.)", "gs"], ["sin_fecha", "Sin fecha vigente (Gs.)", "gs"]),
       ];
-      const fila = (equipo: string, concepto: string, valores: number[], vencidos: number | null, sinFecha: number | null) => ({
+      const fila = (equipo: string, concepto: string, valores: number[], vencidos: number | null, sinFecha: number | null, noIniciados: number | null = null) => ({
         equipo, concepto, ...Object.fromEntries(p.columnas.map((c, i) => [c, valores[i]])),
-        total: valores.reduce((s, v) => s + v, 0), vencidos, sin_fecha: sinFecha,
+        total: valores.reduce((s, v) => s + v, 0), vencidos, no_iniciados: noIniciados, sin_fecha: sinFecha,
       });
       const v = (k: "desa" | "test", t: "entregado" | "proyectado") => p.matriz.map((c) => c[k][t]);
       const sum = (a: number[], b: number[]) => a.map((x, i) => x + b[i]);
       const filas = [
         fila("Desarrollo", "Ya entregado", v("desa", "entregado"), null, null),
-        fila("Desarrollo", "Por entregar", v("desa", "proyectado"), p.vencidos.desa, p.sinFecha.desa),
-        fila("Desarrollo", "Total", sum(v("desa", "entregado"), v("desa", "proyectado")), p.vencidos.desa, p.sinFecha.desa),
+        fila("Desarrollo", "Por entregar", v("desa", "proyectado"), p.vencidos.desa, p.sinFecha.desa, p.noIniciados.desa),
+        fila("Desarrollo", "Total", sum(v("desa", "entregado"), v("desa", "proyectado")), p.vencidos.desa, p.sinFecha.desa, p.noIniciados.desa),
         fila("Testing", "Ya entregado", v("test", "entregado"), null, null),
-        fila("Testing", "Por entregar", v("test", "proyectado"), p.vencidos.test, p.sinFecha.test),
-        fila("Testing", "Total", sum(v("test", "entregado"), v("test", "proyectado")), p.vencidos.test, p.sinFecha.test),
+        fila("Testing", "Por entregar", v("test", "proyectado"), p.vencidos.test, p.sinFecha.test, p.noIniciados.test),
+        fila("Testing", "Total", sum(v("test", "entregado"), v("test", "proyectado")), p.vencidos.test, p.sinFecha.test, p.noIniciados.test),
         fila("Ambos equipos", "Total", sum(sum(v("desa", "entregado"), v("desa", "proyectado")), sum(v("test", "entregado"), v("test", "proyectado"))),
-          p.vencidos.desa + p.vencidos.test, p.sinFecha.desa + p.sinFecha.test),
+          p.vencidos.desa + p.vencidos.test, p.sinFecha.desa + p.sinFecha.test, p.noIniciados.desa + p.noIniciados.test),
         fila("Ambos equipos", "De fecha estimada", p.matriz.map((c) => c.estimado), null, null),
       ];
       return una({ id: "proyeccion", titulo: "Proyección por mes y equipo", columnas, filas,
         nota: "Si hay desarrollo y testing manda el fin de testing; si solo hay desarrollo, el fin de desarrollo; si es solo testing, el fin de testing. Fechas corregidas por pausas, en días hábiles." });
     } },
+    { id: "conciliacion", titulo: "Conciliación", construir: async () => {
+      const p = await datos();
+      const c = p.conciliacion;
+      const monto = (l: ItemProyeccion[]) => l.reduce((s, i) => s + i.desa + i.test, 0);
+      const de = (d: string, f?: (m: string | null) => boolean) => p.items.filter((i) => i.destino === d && (!f || f(i.mes)));
+      const filas = [
+        { concepto: "Planilla de seguimiento de desarrollo", sgr: c.planillaDesa.sgr, monto: c.planillaDesa.monto },
+        { concepto: "Planilla de seguimiento de testing", sgr: c.planillaTest.sgr, monto: c.planillaTest.monto },
+        { concepto: "Total de las planillas en curso", sgr: c.planillaDesa.sgr + c.planillaTest.sgr, monto: c.planillaDesa.monto + c.planillaTest.monto },
+        { concepto: "Menos: SGR en las dos planillas, contados una sola vez", sgr: c.repetidos.sgr, monto: -c.repetidos.monto },
+        { concepto: "Menos: SGR sin importe (en análisis o sin presupuesto)", sgr: c.sinImporte.sgr, monto: 0 },
+        { concepto: "Más: implementados en el mes (planilla de facturación)", sgr: c.implementados.sgr, monto: c.implementados.monto },
+        { concepto: "Total de la proyección", sgr: c.total.sgr, monto: c.total.monto },
+        { concepto: "Reparto: ya entregado en el mes en curso", sgr: de("entregado").length, monto: monto(de("entregado")) },
+        { concepto: "Reparto: por entregar hasta diciembre", sgr: de("proyectado", (m) => m !== "siguiente").length, monto: monto(de("proyectado", (m) => m !== "siguiente")) },
+        { concepto: "Reparto: año siguiente", sgr: de("proyectado", (m) => m === "siguiente").length, monto: monto(de("proyectado", (m) => m === "siguiente")) },
+        { concepto: "Reparto: vencidos sin entregar", sgr: de("vencido").length, monto: monto(de("vencido")) },
+        { concepto: "Reparto: no iniciados", sgr: de("no_iniciado").length, monto: monto(de("no_iniciado")) },
+        { concepto: "Reparto: sin fecha vigente", sgr: de("sin_fecha").length, monto: monto(de("sin_fecha")) },
+        { concepto: "Reparto: entregados en meses anteriores, sin implementar", sgr: de("entregado_antes").length, monto: monto(de("entregado_antes")) },
+      ];
+      return una({ id: "conciliacion", titulo: "Conciliación con las planillas",
+        columnas: cols(["concepto", "Concepto", "texto"], ["sgr", "SGR", "entero"], ["monto", "Importe (Gs.)", "gs"]), filas,
+        nota: "Los SGR sin importe suman cero. Los entregados en meses anteriores siguen en las planillas porque todavía no se implementaron." });
+    } },
     { id: "detalle", titulo: "Detalle por SGR", construir: async () => {
       const p = await datos();
       const destino = (i: ItemProyeccion) => i.destino === "entregado" ? `${nombreCol(i.mes!)}: entregado`
-        : i.destino === "vencido" ? "Vencido sin entregar" : i.destino === "sin_fecha" ? "Sin fecha vigente" : nombreCol(i.mes!);
-      const orden = { entregado: 0, proyectado: 1, vencido: 2, sin_fecha: 3 };
+        : i.destino === "entregado_antes" ? `Entregado antes del mes en curso (${i.fecha ? i.fecha.slice(5, 7) + "/" + i.fecha.slice(0, 4) : "s/f"})`
+        : i.destino === "vencido" ? "Vencido sin entregar" : i.destino === "no_iniciado" ? "No iniciado"
+        : i.destino === "sin_fecha" ? "Sin fecha vigente" : nombreCol(i.mes!);
+      const orden = { entregado: 0, proyectado: 1, vencido: 2, no_iniciado: 3, sin_fecha: 4, entregado_antes: 5 };
       return una({
         id: "detalle", titulo: "Detalle por SGR",
         columnas: cols(["destino", "Mes asignado", "texto"], ["sgr", "SGR", "texto"], ["asunto", "Asunto", "texto"], ["escenario", "Escenario", "texto"],

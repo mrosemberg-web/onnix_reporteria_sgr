@@ -58,11 +58,13 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
         <Indicador nombre="SGR" valor={num(r.sgr)} nota={`${num(r.porEtapa.activo)} en trabajo; ${num(r.porEtapa.cola)} en cola; ${num(r.porEtapa.planificacion)} en análisis`} />
         <Indicador nombre="Atrasados" valor={num(r.atrasados)} nota={`${num(r.diasAtraso)} días acumulados`} />
         <Indicador nombre="Atraso por ejecución" valor={pct(r.diasAtraso ? r.causas.ejecucion / r.diasAtraso : 0)} nota={`${num(r.causas.ejecucion)} días`} />
-        <Indicador nombre="Esperando al cliente" valor={num(r.esperandoCliente)} nota={`${num(r.causas.cliente + r.causas.pausas)} días de atraso por cliente y pausas anteriores`} />
+        <Indicador nombre="Esperando al cliente" valor={num(r.esperandoCliente)}
+          nota={`ya iniciados${r.esperandoClienteSinIniciar ? `; +${num(r.esperandoClienteSinIniciar)} antes de iniciar` : ""}`} />
         {fz === "test"
           ? <Indicador nombre="Devoluciones al desarrollador" valor={num(r.devoluciones)} nota={`en ${num(r.sgrConDevolucion)} SGR; ${num(r.devueltosAhora)} devueltos hoy`} />
           : <Indicador nombre="Excedidos en horas" valor={num(r.excedidos)} nota={`${horas(r.horasExcedidas)} por encima del presupuesto`} />}
-        <Indicador nombre="Horas usadas" valor={pct(r.presuConTrab ? r.trabConPresu / r.presuConTrab : null)} nota={`${horas(r.trabConPresu)} de ${horas(r.presuConTrab)} presupuestadas`} />
+        <Indicador nombre="Horas usadas" valor={pct(r.presuConTrab ? r.trabConPresu / r.presuConTrab : null)}
+          nota={`${horas(r.trabConPresu)} de ${horas(r.presuConTrab)} presupuestadas${r.horasAntesDeIniciar ? `; ${horas(r.horasAntesDeIniciar)} antes de iniciar, aparte` : ""}`} />
         <Indicador nombre="Horas cargadas ayer" valor={horas(r.horasAyer)} nota={`${num(personas.filter((p) => p.r.horasAyer > 0).length)} de ${num(personas.length)} personas`} />
       </section>
 
@@ -88,7 +90,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
           <table>
             <thead>
               <tr>
-                <th>{t.persona}</th><th>Líder</th><th className="n">SGR</th><th className="n">En trabajo</th><th className="n">Cliente</th>
+                <th>{t.persona}</th><th>Líder</th><th className="n">SGR</th><th className="n">En trabajo</th><th className="n" title="Esperando al cliente, ya iniciados">Cliente</th><th className="n" title="Sin fecha de inicio">Sin iniciar</th>
                 {fz === "test" && <th className="n">Devoluciones</th>}
                 {fz === "desa" && mostrarDev && <th className="n">Devoluciones recibidas</th>}
                 <th className="n">Atrasados</th><th className="n">Atraso externo</th>
@@ -104,6 +106,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
                   <td className="n">{num(p.r.sgr)}</td>
                   <td className="n">{num(p.r.porEtapa.activo)}</td>
                   <td className="n">{num(p.r.esperandoCliente)}</td>
+                  <td className="n">{p.r.noIniciados || ""}</td>
                   {fz === "test" && <td className="n">{num(p.r.devoluciones)}</td>}
                   {fz === "desa" && mostrarDev && <td className="n">{num(devDe.get(p.usuario)?.devoluciones ?? 0)}</td>}
                   <td className="n">{num(p.r.atrasados)}</td>
@@ -126,7 +129,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
           errores encontrados. <strong>Atraso por devoluciones</strong>: días que esos SGR estuvieron frenados en testing esperando su corrección.{" "}</>}
           {fz === "test" && <><strong>Esperando corrección del desarrollador</strong>: días de atraso de SGR devueltos al desarrollador; no es demora del tester.{" "}</>}
           <strong>Pausa sin motivo</strong>: días en pausa sin indicar si se espera al cliente. <strong>Atraso por ejecución</strong>: atraso que no explican
-          las causas anteriores. <strong>Horas usadas</strong>: horas trabajadas sobre presupuestadas, en SGR con presupuesto y horas cargadas.
+          las causas anteriores. <strong>Sin iniciar</strong>: SGR sin fecha de inicio (análisis, presupuesto, en cola o esperando al cliente para arrancar); no tienen plazo corriendo. <strong>Horas usadas</strong>: horas trabajadas sobre presupuestadas, en SGR iniciados con presupuesto y horas cargadas; las horas cargadas antes de iniciar quedan aparte.
           <strong> Excedidos</strong>: SGR con más horas trabajadas que presupuestadas.
           {fz === "desa" && !hayDesarrollador && <> Para atribuir las devoluciones de testing a cada desarrollador, la planilla de testing debe incluir la columna «Desarrollador».</>}
         </p>

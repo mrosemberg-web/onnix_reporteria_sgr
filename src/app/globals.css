@@ -342,3 +342,6 @@ td.nombre { white-space: nowrap; }
 .secciones-campo input, .editor-secciones input { width: auto !important; }
 .editor-secciones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .editor-secciones button { font: inherit; font-size: 0.8rem; padding: 3px 10px; border-radius: var(--r-chico); border: 1px solid var(--linea); background: var(--superficie); color: var(--desa); cursor: pointer; }
+
+.tabla-conciliacion tr.subtotal td { font-weight: 650; border-top: 2px solid var(--linea); }
+.tabla-conciliacion tr.grupo td { font-weight: 650; background: var(--superficie-2); }

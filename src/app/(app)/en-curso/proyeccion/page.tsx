@@ -15,7 +15,7 @@ export const metadata = { title: "Proyección de entregas" };
 const M = (v: number) => num(v / 1e6, 1);
 const nombreCol = (c: string, actual: string) =>
   c === "siguiente" ? "Año siguiente" : `${MESES[+c.slice(5, 7) - 1]} ${c.slice(0, 4)}${c === actual ? " (en curso)" : ""}`;
-const ORDEN = { entregado: 0, proyectado: 1, vencido: 2, sin_fecha: 3 };
+const ORDEN = { entregado: 0, proyectado: 1, vencido: 2, no_iniciado: 3, sin_fecha: 4, entregado_antes: 5 };
 
 export default async function Proyeccion({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sesion = await requerirSeccion("implementados");
@@ -33,6 +33,19 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
   const proyectadoTotal = p.matriz.reduce((s, c) => s + c.desa.proyectado + c.test.proyectado, 0);
   const estimadoTotal = p.matriz.reduce((s, c) => s + c.estimado, 0);
   const venc = p.vencidos.desa + p.vencidos.test, sinF = p.sinFecha.desa + p.sinFecha.test;
+  const noIni = p.noIniciados.desa + p.noIniciados.test;
+  const c = p.conciliacion;
+  const cuenta = (d: string, mes?: (m: string | null) => boolean) => p.items.filter((i) => i.destino === d && (!mes || mes(i.mes)));
+  const monto = (l: ItemProyeccion[]) => l.reduce((s, i) => s + i.desa + i.test, 0);
+  const reparto: [string, number, number][] = [
+    [`Ya entregado en ${MESES_LARGOS[+actual.slice(5, 7) - 1]}`, cuenta("entregado").length, monto(cuenta("entregado"))],
+    ["Por entregar hasta diciembre", cuenta("proyectado", (m) => m !== "siguiente").length, monto(cuenta("proyectado", (m) => m !== "siguiente"))],
+    ["Año siguiente", cuenta("proyectado", (m) => m === "siguiente").length, monto(cuenta("proyectado", (m) => m === "siguiente"))],
+    ["Vencidos sin entregar", p.vencidos.sgr, p.vencidos.desa + p.vencidos.test],
+    ["No iniciados", p.noIniciados.sgr, noIni],
+    ["Sin fecha vigente", p.sinFecha.sgr, sinF],
+    ["Entregados en meses anteriores, todavía sin implementar", p.entregadosAntes.sgr, p.entregadosAntes.desa + p.entregadosAntes.test],
+  ];
   const nombreMesLargo = (c: string) => MESES_LARGOS[+c.slice(5, 7) - 1];
 
   let acc = 0;
@@ -55,7 +68,8 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
     `En ${nombreMesLargo(actual)} se proyectan ${gsCorto(tot(mesActual))}: ${gsCorto(mesActual.desa.entregado + mesActual.test.entregado)} ya entregados (${num(mesActual.entregados)} SGR) y ${gsCorto(mesActual.desa.proyectado + mesActual.test.proyectado)} por entregar (${num(mesActual.proyectados)} SGR).`,
     `Hasta diciembre suman ${gsCorto(totalAnio)}; el año siguiente acumula ${gsCorto(tot(siguiente))} en ${num(siguiente.proyectados)} SGR.`,
     venc ? `${num(p.vencidos.sgr)} SGR con la fecha vencida y sin entregar suman ${gsCorto(venc)}. No entran en ningún mes; si se entregaran este mes, el total de ${nombreMesLargo(actual)} llegaría a ${gsCorto(tot(mesActual) + venc)}.` : "",
-    sinF ? `${num(p.sinFecha.sgr)} SGR sin fecha vigente (sin estimación o en análisis de alcance) suman ${gsCorto(sinF)}.` : "",
+    noIni ? `${num(p.noIniciados.sgr)} SGR que todavía no iniciaron suman ${gsCorto(noIni)}: no tienen fecha de inicio ni de entrega, así que no entran en ningún mes.` : "",
+    sinF ? `${num(p.sinFecha.sgr)} SGR iniciados sin fecha vigente (sin estimación o en análisis de alcance) suman ${gsCorto(sinF)}.` : "",
     estimadoTotal ? `${pct(proyectadoTotal ? estimadoTotal / proyectadoTotal : 0)} del monto por entregar depende de fechas de fin de testing estimadas, porque esos SGR todavía están en desarrollo.` : "",
   ].filter(Boolean);
 
@@ -88,7 +102,8 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
           nota={p.mesCerrado && p.hasta.slice(0, 7) === actual ? `${MESES[+actual.slice(5, 7) - 1]} cerrado al ${fecha(p.hasta)}` : `incluye ${MESES[+actual.slice(5, 7) - 1]}`} />
         <Indicador nombre="Año siguiente" valor={gsCorto(tot(siguiente))} nota={`${num(siguiente.proyectados)} SGR`} />
         <Indicador nombre="Vencidos sin entregar" valor={gsCorto(venc)} nota={`${num(p.vencidos.sgr)} SGR, fuera de los meses`} />
-        <Indicador nombre="Sin fecha vigente" valor={gsCorto(sinF)} nota={`${num(p.sinFecha.sgr)} SGR`} />
+        <Indicador nombre="Sin fecha" valor={gsCorto(noIni + sinF)}
+          nota={`${gsCorto(noIni)} no iniciados (${num(p.noIniciados.sgr)} SGR); ${gsCorto(sinF)} sin estimación (${num(p.sinFecha.sgr)} SGR)`} />
         <Indicador nombre="Con fecha estimada" valor={pct(proyectadoTotal ? estimadoTotal / proyectadoTotal : 0)} nota="del monto por entregar" />
       </section>
 
@@ -107,26 +122,27 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
                 {p.columnas.map((c) => <th key={c} className="n">{nombreCol(c, actual)}</th>)}
                 <th className="n">Total</th>
                 <th className="n" title="Fecha pasada y todavía en curso">Vencidos sin entregar</th>
-                <th className="n" title="Sin fecha estimada o en análisis de alcance">Sin fecha vigente</th>
+                <th className="n" title="Sin fecha de inicio: no tienen fecha de entrega">No iniciados</th>
+                <th className="n" title="Iniciados sin fecha estimada o en análisis de alcance">Sin fecha vigente</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="grupo"><td colSpan={p.columnas.length + 4}>Desarrollo: {equipo("desa")}</td></tr>
-              {fila("Ya entregado", serie("desa", "entregado"), [0, 0])}
-              {fila("Por entregar", serie("desa", "proyectado"), [p.vencidos.desa, p.sinFecha.desa])}
-              {fila("Total desarrollo", suma(serie("desa", "entregado"), serie("desa", "proyectado")), [p.vencidos.desa, p.sinFecha.desa], "subtotal")}
-              <tr className="grupo"><td colSpan={p.columnas.length + 4}>Testing: {equipo("test")}</td></tr>
-              {fila("Ya entregado", serie("test", "entregado"), [0, 0])}
-              {fila("Por entregar", serie("test", "proyectado"), [p.vencidos.test, p.sinFecha.test])}
-              {fila("Total testing", suma(serie("test", "entregado"), serie("test", "proyectado")), [p.vencidos.test, p.sinFecha.test], "subtotal")}
+              <tr className="grupo"><td colSpan={p.columnas.length + 5}>Desarrollo: {equipo("desa")}</td></tr>
+              {fila("Ya entregado", serie("desa", "entregado"), [0, 0, 0])}
+              {fila("Por entregar", serie("desa", "proyectado"), [p.vencidos.desa, p.noIniciados.desa, p.sinFecha.desa])}
+              {fila("Total desarrollo", suma(serie("desa", "entregado"), serie("desa", "proyectado")), [p.vencidos.desa, p.noIniciados.desa, p.sinFecha.desa], "subtotal")}
+              <tr className="grupo"><td colSpan={p.columnas.length + 5}>Testing: {equipo("test")}</td></tr>
+              {fila("Ya entregado", serie("test", "entregado"), [0, 0, 0])}
+              {fila("Por entregar", serie("test", "proyectado"), [p.vencidos.test, p.noIniciados.test, p.sinFecha.test])}
+              {fila("Total testing", suma(serie("test", "entregado"), serie("test", "proyectado")), [p.vencidos.test, p.noIniciados.test, p.sinFecha.test], "subtotal")}
             </tbody>
             <tfoot>
-              {fila("Total de los dos equipos", p.matriz.map(tot), [venc, sinF])}
+              {fila("Total de los dos equipos", p.matriz.map(tot), [venc, noIni, sinF])}
               <tr>
                 <td>SGR</td>
                 {p.matriz.map((c) => <td key={c.clave} className="n">{num(c.entregados + c.proyectados)}</td>)}
                 <td className="n">{num(p.matriz.reduce((s, c) => s + c.entregados + c.proyectados, 0))}</td>
-                <td className="n debil">{num(p.vencidos.sgr)}</td><td className="n debil">{num(p.sinFecha.sgr)}</td>
+                <td className="n debil">{num(p.vencidos.sgr)}</td><td className="n debil">{num(p.noIniciados.sgr)}</td><td className="n debil">{num(p.sinFecha.sgr)}</td>
               </tr>
             </tfoot>
           </table>
@@ -152,6 +168,33 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
             { nombre: "Testing, ya entregado", color: "var(--test)" },
             { nombre: "Testing, por entregar", color: "color-mix(in srgb, var(--test) 45%, var(--superficie))", colorTexto: "var(--tinta)" },
           ]} />
+      </section>
+
+      <section className="panel">
+        <div className="panel-cab">
+          <TituloRegion region="conciliacion">Conciliación con las planillas</TituloRegion>
+          <p>De dónde sale el total de la proyección y cómo se reparte. Con los mismos filtros de la pantalla.</p>
+        </div>
+        <div className="tabla-env">
+          <table className="tabla-conciliacion">
+            <thead><tr><th>Concepto</th><th className="n">SGR</th><th className="n">Importe (Gs.)</th></tr></thead>
+            <tbody>
+              <tr><td>Planilla de seguimiento de desarrollo</td><td className="n">{num(c.planillaDesa.sgr)}</td><td className="n">{gs(c.planillaDesa.monto)}</td></tr>
+              <tr><td>Planilla de seguimiento de testing</td><td className="n">{num(c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaTest.monto)}</td></tr>
+              <tr className="subtotal"><td>Total de las planillas en curso</td><td className="n">{num(c.planillaDesa.sgr + c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaDesa.monto + c.planillaTest.monto)}</td></tr>
+              {c.repetidos.sgr > 0 && <tr><td>Menos: SGR en las dos planillas, contados una sola vez</td><td className="n">{num(c.repetidos.sgr)}</td><td className="n">−{gs(c.repetidos.monto)}</td></tr>}
+              {c.sinImporte.sgr > 0 && <tr><td>Menos: SGR sin importe (en análisis o sin presupuesto)</td><td className="n">{num(c.sinImporte.sgr)}</td><td className="n">{gs(0)}</td></tr>}
+              <tr><td>Más: implementados en el mes, según la planilla de facturación</td><td className="n">{num(c.implementados.sgr)}</td><td className="n">+{gs(c.implementados.monto)}</td></tr>
+              <tr className="subtotal"><td>Total de la proyección</td><td className="n">{num(c.total.sgr)}</td><td className="n">{gs(c.total.monto)}</td></tr>
+              <tr className="grupo"><td colSpan={3}>Se reparte en</td></tr>
+              {reparto.map(([t, n, m]) => <tr key={t}><td>{t}</td><td className="n">{num(n)}</td><td className="n">{gs(m)}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+        <p className="debil" style={{ marginTop: 10, fontSize: "0.82rem" }}>
+          Los SGR sin importe (en análisis o sin presupuesto) suman cero. Los entregados en meses anteriores terminaron la fase que manda pero
+          siguen en las planillas porque todavía no se implementaron: ya contaron en su mes y no se vuelven a proyectar.
+        </p>
       </section>
 
       <section className="panel">
@@ -198,6 +241,8 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
 function DestinoChip({ i, actual }: { i: ItemProyeccion; actual: string }) {
   if (i.destino === "entregado") return <span className="etiqueta e-bien">{nombreCol(actual, "")}: entregado</span>;
   if (i.destino === "vencido") return <span className="etiqueta e-mal">Vencido</span>;
+  if (i.destino === "no_iniciado") return <span className="etiqueta e-neutro">No iniciado</span>;
+  if (i.destino === "entregado_antes") return <span className="etiqueta e-bien">Entregado antes{i.fecha ? ` (${i.fecha.slice(5, 7)}/${i.fecha.slice(0, 4)})` : ""}</span>;
   if (i.destino === "sin_fecha") return <span className="etiqueta e-neutro">Sin fecha vigente</span>;
   return <span className="etiqueta e-desa">{nombreCol(i.mes!, "")}</span>;
 }

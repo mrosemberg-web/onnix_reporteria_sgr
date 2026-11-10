@@ -19,20 +19,21 @@
 import type { FilaSeguimiento } from "./planilla-seguimiento";
 
 export type Etapa =
-  | "planificacion" | "cola" | "activo" | "cliente" | "devuelto" | "pausa" | "finalizado" | "sin_asignacion" | "otro";
+  | "planificacion" | "cola" | "activo" | "cliente" | "cliente_sin_iniciar" | "devuelto" | "pausa" | "finalizado" | "sin_asignacion" | "otro";
 
 export const ETAPAS: Record<Etapa, { nombre: string; clase: string; color: string }> = {
   planificacion: { nombre: "Análisis y presupuesto", clase: "e-neutro", color: "var(--tinta-3)" },
   cola: { nombre: "En cola", clase: "e-neutro", color: "#8a94a8" },
   activo: { nombre: "En trabajo", clase: "e-desa", color: "var(--desa)" },
   cliente: { nombre: "Esperando al cliente", clase: "e-leve", color: "var(--leve)" },
+  cliente_sin_iniciar: { nombre: "Esperando al cliente, sin iniciar", clase: "e-neutro", color: "#c9b06a" },
   devuelto: { nombre: "Devuelto al desarrollador", clase: "e-test", color: "var(--test)" },
   pausa: { nombre: "En pausa", clase: "e-neutro", color: "#a58f6a" },
   finalizado: { nombre: "Fase finalizada", clase: "e-bien", color: "var(--bien)" },
   sin_asignacion: { nombre: "Sin asignación", clase: "e-neutro", color: "var(--tinta-3)" },
   otro: { nombre: "Otro estado", clase: "e-neutro", color: "var(--tinta-3)" },
 };
-export const ORDEN_ETAPAS: Etapa[] = ["planificacion", "cola", "activo", "cliente", "devuelto", "pausa", "finalizado", "otro"];
+export const ORDEN_ETAPAS: Etapa[] = ["planificacion", "cola", "cliente_sin_iniciar", "activo", "cliente", "devuelto", "pausa", "finalizado", "otro"];
 
 /** Clasifica el estado del sistema en una etapa. Por palabras clave, para tolerar estados nuevos. */
 export function etapaDe(estado: string | null): Etapa {
@@ -105,6 +106,10 @@ export type Analisis = FilaSeguimiento & {
   horasExcedidas: number;
   /** Días hábiles de la detención actual que no figuran en las horas pausadas (dato a revisar). */
   pausaSinRegistrar: number;
+  /** Tiene fecha de inicio (o ya terminó su fase). Sin inicio no hay plazo corriendo. */
+  iniciado: boolean;
+  /** Horas cargadas antes de iniciar (análisis, presupuesto): no cuentan contra el presupuesto. */
+  horasAntesDeIniciar: number;
   /** Solo testing: desarrollador reconocido en la planilla de desarrollo (usuario), o null. */
   devUsuario: string | null;
   /** Solo testing: nombre del desarrollador para mostrar. */
@@ -149,17 +154,22 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   const corrido = Math.round(diasPausa);
   const N = E != null ? sumarHabiles(E, corrido, fer) : null;
   const entregaCorregida = N != null ? iso(N) : null;
-  const etapa = f.id_req === "0" ? "sin_asignacion" : etapaDe(f.estado);
+  const etapaEstado: Etapa = f.id_req === "0" ? "sin_asignacion" : etapaDe(f.estado);
+  // No iniciado: sin fecha de inicio y sin haber terminado la fase. No hay plazo corriendo.
+  const iniciado = I != null || etapaEstado === "finalizado";
+  const etapa: Etapa = etapaEstado === "cliente" && !iniciado ? "cliente_sin_iniciar" : etapaEstado;
   const lider = f.team_leader ?? (lideres.has(f.usuario) ? f.usuario : "Sin líder");
   const causas: Record<Causa, number> = { pausas: 0, cliente: 0, devoluciones: 0, pausa: 0, ejecucion: 0 };
-  const consumo = f.horas_presu && f.horas_presu > 0 ? f.horas_trab / f.horas_presu : null;
-  const horasExcedidas = f.horas_presu != null && f.horas_trab > f.horas_presu ? f.horas_trab - f.horas_presu : 0;
+  // Las horas cargadas antes de iniciar son de análisis o presupuesto: no se comparan con el presupuesto.
+  const consumo = iniciado && f.horas_presu && f.horas_presu > 0 ? f.horas_trab / f.horas_presu : null;
+  const horasExcedidas = iniciado && f.horas_presu != null && f.horas_trab > f.horas_presu ? f.horas_trab - f.horas_presu : 0;
+  const horasAntesDeIniciar = iniciado ? 0 : f.horas_trab;
   const diasEnEstado = S != null ? habilesDespues(S, C, fer) : null;
 
   const detenido = etapa === "cliente" || etapa === "devuelto" || etapa === "pausa";
-  const pausaSinRegistrar = detenido && S != null
+  const pausaSinRegistrar = detenido && iniciado && S != null
     ? Math.max(0, Math.floor(habilesDespues(S, C, fer) - diasPausa)) : 0;
-  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida,
+  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida, iniciado, horasAntesDeIniciar,
     devUsuario: null, devNombre: f.desarrollador ?? null, devExterno: (f.importe_desa ?? 0) === 0 };
   if (etapa === "sin_asignacion") {
     return { ...base, situacion: "sin_asignacion", atraso: null, causaPrincipal: null, avance: null, ejecucion: null };
@@ -231,7 +241,12 @@ export type ResumenGrupo = {
   atrasados: number;
   diasAtraso: number;
   causas: Record<Causa, number>;
+  /** Esperando al cliente con el SGR ya iniciado. */
   esperandoCliente: number;
+  /** Esperando al cliente antes de iniciar. */
+  esperandoClienteSinIniciar: number;
+  noIniciados: number;
+  horasAntesDeIniciar: number;
   devoluciones: number;
   sgrConDevolucion: number;
   devueltosAhora: number;
@@ -253,7 +268,7 @@ export function resumir(items: Analisis[]): ResumenGrupo {
   const r: ResumenGrupo = {
     sgr: 0, porEtapa: Object.fromEntries(Object.keys(ETAPAS).map((k) => [k, 0])) as Record<Etapa, number>,
     atrasados: 0, diasAtraso: 0, causas: { pausas: 0, cliente: 0, devoluciones: 0, pausa: 0, ejecucion: 0 },
-    esperandoCliente: 0, devoluciones: 0, sgrConDevolucion: 0, devueltosAhora: 0, horasAyer: 0, horasTrab: 0, horasPresu: 0,
+    esperandoCliente: 0, esperandoClienteSinIniciar: 0, noIniciados: 0, horasAntesDeIniciar: 0, devoluciones: 0, sgrConDevolucion: 0, devueltosAhora: 0, horasAyer: 0, horasTrab: 0, horasPresu: 0,
     trabConPresu: 0, presuConTrab: 0, excedidos: 0, horasExcedidas: 0, sinPlan: 0, enAnalisis: 0, pausasSinRegistrar: 0, importe: 0,
   };
   for (const a of items) {
@@ -270,13 +285,16 @@ export function resumir(items: Analisis[]): ResumenGrupo {
       for (const c of ORDEN_CAUSAS) r.causas[c] += a.causas[c];
     }
     if (a.etapa === "cliente") r.esperandoCliente++;
+    if (a.etapa === "cliente_sin_iniciar") r.esperandoClienteSinIniciar++;
+    if (!a.iniciado) { r.noIniciados++; r.horasAntesDeIniciar += a.horasAntesDeIniciar; }
     if (a.etapa === "devuelto") r.devueltosAhora++;
     r.devoluciones += a.devoluciones ?? 0;
     if ((a.devoluciones ?? 0) > 0) r.sgrConDevolucion++;
     r.horasTrab += a.horas_trab;
     r.horasPresu += a.horas_presu ?? 0;
-    if (a.horas_presu && a.horas_trab > 0) { r.trabConPresu += a.horas_trab; r.presuConTrab += a.horas_presu; }
+    if (a.iniciado && a.horas_presu && a.horas_trab > 0) { r.trabConPresu += a.horas_trab; r.presuConTrab += a.horas_presu; }
     if (a.horasExcedidas > 0) { r.excedidos++; r.horasExcedidas += a.horasExcedidas; }
+    // Un SGR en ambas planillas se cuenta una vez (manda la de testing): ver cartera().
     r.importe += a.importe_total ?? 0;
   }
   return r;
@@ -345,4 +363,11 @@ export function devolucionesPorDesarrollador(itemsTesting: Analisis[]): Devoluci
     mapa.set(clave, d);
   }
   return [...mapa.values()].sort((a, b) => Number(a.externo) - Number(b.externo) || b.devoluciones - a.devoluciones || b.atraso - a.atraso);
+}
+
+/** Importe de la cartera en curso: cada SGR una sola vez, aunque figure en las dos planillas (manda testing). */
+export function cartera(items: Analisis[]) {
+  const enTesting = new Set(items.filter((a) => a.fase === "test" && a.etapa !== "sin_asignacion").map((a) => a.id_req));
+  const unicos = items.filter((a) => a.etapa !== "sin_asignacion" && !(a.fase === "desa" && enTesting.has(a.id_req)));
+  return { sgr: unicos.length, monto: unicos.reduce((s, a) => s + (a.importe_total ?? 0), 0), repetidos: items.filter((a) => a.fase === "desa" && enTesting.has(a.id_req)).length };
 }

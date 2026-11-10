@@ -8,7 +8,7 @@ import { dias, fecha, gsCorto, horas, num, pct } from "@/lib/formato";
 import { lecturaSeguimiento } from "@/lib/lectura-seguimiento";
 import { aplicarFiltros, cargarSeguimiento, leerFiltrosSeguimiento, opcionesSeguimiento } from "@/lib/seguimiento";
 import {
-  CAUSAS, EJECUCION, ETAPAS, mediana, ORDEN_CAUSAS, ORDEN_ETAPAS, resumir, type Ejecucion,
+  CAUSAS, cartera, EJECUCION, ETAPAS, mediana, ORDEN_CAUSAS, ORDEN_ETAPAS, resumir, type Analisis, type Ejecucion,
 } from "@/lib/seguimiento-calculo";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +26,13 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
   const sgr = items.filter((a) => a.etapa !== "sin_asignacion");
   const porFase = { desa: sgr.filter((a) => a.fase === "desa"), test: sgr.filter((a) => a.fase === "test") };
   const r = resumir(items);
+  const cart = cartera(items);
   const rd = resumir(porFase.desa), rt = resumir(porFase.test);
   const conFecha = sgr.filter((a) => ["atrasado", "vence_pronto", "en_plazo"].includes(a.situacion)).length;
-  const cliente = sgr.filter((a) => a.etapa === "cliente").sort((a, b) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0));
+  const porEspera = (a: Analisis, b: Analisis) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0);
+  // Con el SGR iniciado (el plazo corre) y antes de iniciar (esperan información para arrancar).
+  const cliente = sgr.filter((a) => a.etapa === "cliente").sort(porEspera);
+  const clienteSinIniciar = sgr.filter((a) => a.etapa === "cliente_sin_iniciar").sort(porEspera);
   const personas = new Set(items.map((a) => a.usuario));
   const sinHorasAyer = [...personas].filter((p) => items.filter((a) => a.usuario === p).every((a) => a.horas_ayer === 0));
   const masAtrasados = sgr.filter((a) => a.situacion === "atrasado").sort((a, b) => (b.atraso ?? 0) - (a.atraso ?? 0)).slice(0, 12);
@@ -46,11 +50,13 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
         <Indicador nombre="Días hábiles de atraso" valor={num(r.diasAtraso)}
           nota={r.diasAtraso ? `${pct((r.causas.pausas + r.causas.cliente) / r.diasAtraso)} por cliente y pausas anteriores; ${pct(r.causas.ejecucion / r.diasAtraso)} por ejecución` : undefined} />
         <Indicador nombre="Esperando al cliente" valor={num(cliente.length)}
-          nota={cliente.length ? `mediana de ${dias(mediana(cliente.map((a) => a.diasEnEstado ?? 0)))} en espera` : undefined} />
+          nota={[cliente.length ? `ya iniciados; mediana de ${dias(mediana(cliente.map((a) => a.diasEnEstado ?? 0)))} en espera` : "ya iniciados",
+            clienteSinIniciar.length ? `+${num(clienteSinIniciar.length)} antes de iniciar` : ""].filter(Boolean).join("; ")} />
         <Indicador nombre="Devoluciones de testing" valor={num(r.devoluciones)} nota={`en ${num(r.sgrConDevolucion)} SGR; ${num(r.devueltosAhora)} devueltos hoy`} />
         <Indicador nombre="Horas cargadas ayer" valor={horas(r.horasAyer)}
           nota={`${num(personas.size - sinHorasAyer.length)} de ${num(personas.size)} personas`} />
-        <Indicador nombre="Cartera en curso" valor={gsCorto(r.importe)} nota="importe total presupuestado" />
+        <Indicador nombre="Cartera en curso" valor={gsCorto(cart.monto)}
+          nota={`importe total de las planillas en curso, ${num(cart.sgr)} SGR${cart.repetidos ? ` (${cart.repetidos} en ambas planillas, contados una vez)` : ""}`} />
       </section>
 
       <Lectura parrafos={lecturaSeguimiento(items)} />
@@ -128,20 +134,21 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
         <TablaSgr items={masAtrasados} corte={corte} />
       </section>
 
-      {cliente.length > 0 && (
+      {cliente.length + clienteSinIniciar.length > 0 && (
         <section className="panel">
           <div className="panel-cab">
             <TituloRegion region="esperando_cliente">Esperando al cliente</TituloRegion>
-            <p>Para gestionar con el cliente, del que más tiempo lleva esperando al más reciente.</p>
+            <p>Para gestionar con el cliente. Primero los SGR ya iniciados (el plazo corre), después los que esperan para empezar; en cada grupo, del que más espera al más reciente.</p>
           </div>
           <div className="tabla-env">
             <table>
-              <thead><tr><th>SGR</th><th>Asunto</th><th>Fase</th><th>Responsable</th><th>Estado</th><th>Desde</th><th className="n">Días hábiles esperando</th><th className="n">Atraso</th></tr></thead>
+              <thead><tr><th>SGR</th><th>Asunto</th><th>Situación</th><th>Fase</th><th>Responsable</th><th>Estado</th><th>Desde</th><th className="n">Días hábiles esperando</th><th className="n">Atraso</th></tr></thead>
               <tbody>
-                {cliente.map((a) => (
+                {[...cliente, ...clienteSinIniciar].map((a) => (
                   <tr key={`${a.fase}-${a.id_req}`}>
                     <td>{a.id_req}</td>
                     <td className="recorte" title={a.asunto ?? ""}>{a.asunto}</td>
+                    <td className="nombre">{a.iniciado ? <span className="etiqueta e-leve">Iniciado</span> : <span className="etiqueta e-neutro">Antes de iniciar</span>}</td>
                     <td>{FASE[a.fase]}</td>
                     <td>{a.nombre ?? a.usuario}</td>
                     <td>{a.estado}</td>

@@ -39,7 +39,14 @@ export function lecturaSeguimiento(items: Analisis[]): string[] {
   const cliente = sgr.filter((a) => a.etapa === "cliente" && a.diasEnEstado != null);
   if (cliente.length) {
     const mas = [...cliente].sort((a, b) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0))[0];
-    out.push(`${num(cliente.length)} SGR esperan respuesta o pruebas del cliente; la mitad lleva más de ${dias(mediana(cliente.map((a) => a.diasEnEstado!)))} hábiles en ese estado. El más antiguo es el SGR ${mas.id_req}, con ${dias(mas.diasEnEstado)} hábiles.`);
+    out.push(`${num(cliente.length)} SGR ya iniciados esperan respuesta o pruebas del cliente; la mitad lleva más de ${dias(mediana(cliente.map((a) => a.diasEnEstado!)))} hábiles en ese estado. El más antiguo es el SGR ${mas.id_req}, con ${dias(mas.diasEnEstado)} hábiles.`);
+  }
+
+  if (r.esperandoClienteSinIniciar) {
+    out.push(`Otros ${num(r.esperandoClienteSinIniciar)} SGR esperan al cliente antes de iniciar: no tienen plazo corriendo, así que no suman atraso.`);
+  }
+  if (r.horasAntesDeIniciar > 0) {
+    out.push(`Se cargaron ${horas(r.horasAntesDeIniciar)} en SGR que todavía no iniciaron (análisis o presupuesto). No se comparan con el presupuesto ni cuentan como excedidas.`);
   }
 
   const tst = sgr.filter((a) => a.fase === "test");
