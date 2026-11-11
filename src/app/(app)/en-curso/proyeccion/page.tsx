@@ -148,7 +148,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
           </table>
         </div>
         <p className="debil" style={{ marginTop: 10, fontSize: "0.82rem" }}>
-          Cada SGR entra completo en un solo mes y su importe de desarrollo va al equipo de desarrollo y el de testing al de testing.
+          De la planilla de desarrollo se toma solo el importe de desarrollo y de la de testing solo el de testing; cada uno entra en un solo mes.
           Para los SGR que siguen en desarrollo y necesitan testing, el fin de testing se estima sumando a su entrega de desarrollo los días
           hábiles de testing que surgen del importe (÷ Gs. {num(TARIFA_TEST_HORA)} por hora ÷ 8 horas). Ya entregado en el mes en curso: implementados
           (incluidos los desestimados por el cliente, con el importe de la planilla, que ya refleja el descuento acordado) y SGR en
@@ -179,21 +179,23 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
           <table className="tabla-conciliacion">
             <thead><tr><th>Concepto</th><th className="n">SGR</th><th className="n">Importe (Gs.)</th></tr></thead>
             <tbody>
-              <tr><td>Planilla de seguimiento de desarrollo</td><td className="n">{num(c.planillaDesa.sgr)}</td><td className="n">{gs(c.planillaDesa.monto)}</td></tr>
-              <tr><td>Planilla de seguimiento de testing</td><td className="n">{num(c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaTest.monto)}</td></tr>
-              <tr className="subtotal"><td>Total de las planillas en curso</td><td className="n">{num(c.planillaDesa.sgr + c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaDesa.monto + c.planillaTest.monto)}</td></tr>
-              {c.repetidos.sgr > 0 && <tr><td>Menos: SGR en las dos planillas, contados una sola vez</td><td className="n">{num(c.repetidos.sgr)}</td><td className="n">−{gs(c.repetidos.monto)}</td></tr>}
-              {c.sinImporte.sgr > 0 && <tr><td>Menos: SGR sin importe (en análisis o sin presupuesto)</td><td className="n">{num(c.sinImporte.sgr)}</td><td className="n">{gs(0)}</td></tr>}
+              <tr><td>Planilla de desarrollo: columna «Importe Fact Desa»</td><td className="n">{num(c.planillaDesa.sgr)}</td><td className="n">{gs(c.planillaDesa.monto)}</td></tr>
+              <tr><td>Planilla de testing: columna «Importe Fact Test»</td><td className="n">{num(c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaTest.monto)}</td></tr>
+              <tr className="subtotal"><td>Cartera en curso</td><td className="n">{num(c.planillaDesa.sgr + c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaDesa.monto + c.planillaTest.monto)}</td></tr>
               <tr><td>Más: implementados en el mes, según la planilla de facturación</td><td className="n">{num(c.implementados.sgr)}</td><td className="n">+{gs(c.implementados.monto)}</td></tr>
               <tr className="subtotal"><td>Total de la proyección</td><td className="n">{num(c.total.sgr)}</td><td className="n">{gs(c.total.monto)}</td></tr>
               <tr className="grupo"><td colSpan={3}>Se reparte en</td></tr>
               {reparto.map(([t, n, m]) => <tr key={t}><td>{t}</td><td className="n">{num(n)}</td><td className="n">{gs(m)}</td></tr>)}
+              <tr className="grupo"><td colSpan={3}>No se toma, para no contar dos veces</td></tr>
+              <tr className="debil"><td>Planilla de desarrollo: columna «Importe Fact Test»</td><td className="n">{num(c.noTomadoDesa.sgr)}</td><td className="n">{gs(c.noTomadoDesa.monto)}</td></tr>
+              <tr className="debil"><td>Planilla de testing: columna «Importe Fact Desa»</td><td className="n">{num(c.noTomadoTest.sgr)}</td><td className="n">{gs(c.noTomadoTest.monto)}</td></tr>
             </tbody>
           </table>
         </div>
         <p className="debil" style={{ marginTop: 10, fontSize: "0.82rem" }}>
-          Los SGR sin importe (en análisis o sin presupuesto) suman cero. Los entregados en meses anteriores terminaron la fase que manda pero
-          siguen en las planillas porque todavía no se implementaron: ya contaron en su mes y no se vuelven a proyectar.
+          De cada planilla se toma solo el importe de su equipo: de la de desarrollo, el de desarrollo; de la de testing, el de testing.
+          La columna «SGR» cuenta los que tienen ese importe. Los entregados en meses anteriores terminaron la fase que manda pero siguen en
+          las planillas porque todavía no se implementaron: ya contaron en su mes y no se vuelven a proyectar.
         </p>
       </section>
 
@@ -210,7 +212,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
             </thead>
             <tbody>
               {ordenados.map((i) => (
-                <tr key={`${i.origen}-${i.id_req}`}>
+                <tr key={`${i.origen}-${i.fase ?? "impl"}-${i.id_req}`}>
                   <td className="nombre"><DestinoChip i={i} actual={actual} /></td>
                   <td className="nombre">{i.id_req}{i.desestimado && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }}>Desestimado</span>}</td>
                   <td className="recorte" title={i.asunto ?? ""}>{i.asunto}</td>

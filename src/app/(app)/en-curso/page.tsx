@@ -56,7 +56,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
         <Indicador nombre="Horas cargadas ayer" valor={horas(r.horasAyer)}
           nota={`${num(personas.size - sinHorasAyer.length)} de ${num(personas.size)} personas`} />
         <Indicador nombre="Cartera en curso" valor={gsCorto(cart.monto)}
-          nota={`importe total de las planillas en curso, ${num(cart.sgr)} SGR${cart.repetidos ? ` (${cart.repetidos} en ambas planillas, contados una vez)` : ""}`} />
+          nota={`${gsCorto(cart.desa)} de desarrollo (planilla de desarrollo) + ${gsCorto(cart.test)} de testing (planilla de testing)`} />
       </section>
 
       <Lectura parrafos={lecturaSeguimiento(items)} />

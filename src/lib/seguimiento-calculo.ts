@@ -294,8 +294,7 @@ export function resumir(items: Analisis[]): ResumenGrupo {
     r.horasPresu += a.horas_presu ?? 0;
     if (a.iniciado && a.horas_presu && a.horas_trab > 0) { r.trabConPresu += a.horas_trab; r.presuConTrab += a.horas_presu; }
     if (a.horasExcedidas > 0) { r.excedidos++; r.horasExcedidas += a.horasExcedidas; }
-    // Un SGR en ambas planillas se cuenta una vez (manda la de testing): ver cartera().
-    r.importe += a.importe_total ?? 0;
+    r.importe += importePropio(a);
   }
   return r;
 }
@@ -365,9 +364,14 @@ export function devolucionesPorDesarrollador(itemsTesting: Analisis[]): Devoluci
   return [...mapa.values()].sort((a, b) => Number(a.externo) - Number(b.externo) || b.devoluciones - a.devoluciones || b.atraso - a.atraso);
 }
 
-/** Importe de la cartera en curso: cada SGR una sola vez, aunque figure en las dos planillas (manda testing). */
+/** Importe que aporta una fila: de la planilla de desarrollo, el de desarrollo; de la de testing, el de testing. */
+export const importePropio = (a: { fase: string; importe_desa: number | null; importe_test: number | null }) =>
+  (a.fase === "desa" ? a.importe_desa : a.importe_test) ?? 0;
+
+/** Cartera en curso: importe de desarrollo de la planilla de desarrollo + importe de testing de la planilla de testing. */
 export function cartera(items: Analisis[]) {
-  const enTesting = new Set(items.filter((a) => a.fase === "test" && a.etapa !== "sin_asignacion").map((a) => a.id_req));
-  const unicos = items.filter((a) => a.etapa !== "sin_asignacion" && !(a.fase === "desa" && enTesting.has(a.id_req)));
-  return { sgr: unicos.length, monto: unicos.reduce((s, a) => s + (a.importe_total ?? 0), 0), repetidos: items.filter((a) => a.fase === "desa" && enTesting.has(a.id_req)).length };
+  const l = items.filter((a) => a.etapa !== "sin_asignacion");
+  const desa = l.filter((a) => a.fase === "desa").reduce((s, a) => s + (a.importe_desa ?? 0), 0);
+  const test = l.filter((a) => a.fase === "test").reduce((s, a) => s + (a.importe_test ?? 0), 0);
+  return { sgr: l.filter((a) => importePropio(a) > 0).length, monto: desa + test, desa, test };
 }

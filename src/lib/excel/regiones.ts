@@ -12,7 +12,7 @@ import {
   aplicarFiltros, cargarSeguimiento, leerFiltrosSeguimiento, opcionesSeguimiento, type FiltrosSeguimiento,
 } from "../seguimiento";
 import {
-  agruparPorPersona, CAUSAS, devolucionesPorDesarrollador, EJECUCION, ETAPAS, ETIQUETA_DEVOLUCIONES, ORDEN_CAUSAS, ORDEN_ETAPAS, porDevolucionesTesting,
+  agruparPorPersona, CAUSAS, devolucionesPorDesarrollador, importePropio, EJECUCION, ETAPAS, ETIQUETA_DEVOLUCIONES, ORDEN_CAUSAS, ORDEN_ETAPAS, porDevolucionesTesting,
   resumir, SITUACIONES, type Analisis, type Ejecucion,
 } from "../seguimiento-calculo";
 import { nombreServicio } from "../servicios";
@@ -283,7 +283,7 @@ const colsDetalleSeg = cols(
   ["devoluciones", "Devoluciones al desarrollador", "entero"], ["ayer", "Horas ayer", "horas"], ["trab", "Horas trabajadas", "horas"],
   ["presu", "Horas presupuestadas", "horas"], ["antes_iniciar", "Horas antes de iniciar", "horas"], ["consumo", "Horas usadas", "pct"], ["excedidas", "Horas excedidas", "horas"],
   ["pausadas", "Horas pausadas de la fase", "horas"], ["otras", "Otras horas pausadas", "horas"],
-  ["sin_registrar", "Días detenido sin pausa registrada", "entero"], ["importe", "Importe total (Gs.)", "gs"],
+  ["sin_registrar", "Días detenido sin pausa registrada", "entero"], ["importe", "Importe del equipo (Gs.)", "gs"],
 );
 const filaSeg = (a: Analisis) => ({
   sgr: a.id_req, fase: FASE[a.fase], asunto: a.asunto, responsable: a.nombre ?? a.usuario, usuario: a.usuario, lider: a.lider,
@@ -296,7 +296,7 @@ const filaSeg = (a: Analisis) => ({
   c_pausa: a.atraso ? a.causas.pausa : null, c_ejec: a.atraso ? a.causas.ejecucion : null,
   diag: a.ejecucion ? EJECUCION[a.ejecucion].nombre : null, devoluciones: a.devoluciones, ayer: a.horas_ayer, trab: a.horas_trab,
   presu: a.horas_presu, consumo: a.consumo, excedidas: a.horasExcedidas || null, pausadas: a.horas_pausadas_fase,
-  otras: a.otras_horas_pausadas, sin_registrar: a.pausaSinRegistrar || null, importe: a.importe_total,
+  otras: a.otras_horas_pausadas, sin_registrar: a.pausaSinRegistrar || null, importe: importePropio(a),
 });
 const ORDEN_SIT = { atrasado: 0, vence_pronto: 1, en_plazo: 2, fin_tarde: 3, replanificacion: 4, sin_plan: 5, fin_a_tiempo: 6, sin_asignacion: 7 };
 const ordenar = (l: Analisis[]) => [...l].sort((a, b) => ORDEN_SIT[a.situacion] - ORDEN_SIT[b.situacion] || (b.atraso ?? 0) - (a.atraso ?? 0));
@@ -519,11 +519,9 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
       const monto = (l: ItemProyeccion[]) => l.reduce((s, i) => s + i.desa + i.test, 0);
       const de = (d: string, f?: (m: string | null) => boolean) => p.items.filter((i) => i.destino === d && (!f || f(i.mes)));
       const filas = [
-        { concepto: "Planilla de seguimiento de desarrollo", sgr: c.planillaDesa.sgr, monto: c.planillaDesa.monto },
-        { concepto: "Planilla de seguimiento de testing", sgr: c.planillaTest.sgr, monto: c.planillaTest.monto },
-        { concepto: "Total de las planillas en curso", sgr: c.planillaDesa.sgr + c.planillaTest.sgr, monto: c.planillaDesa.monto + c.planillaTest.monto },
-        { concepto: "Menos: SGR en las dos planillas, contados una sola vez", sgr: c.repetidos.sgr, monto: -c.repetidos.monto },
-        { concepto: "Menos: SGR sin importe (en análisis o sin presupuesto)", sgr: c.sinImporte.sgr, monto: 0 },
+        { concepto: "Planilla de desarrollo: columna Importe Fact Desa", sgr: c.planillaDesa.sgr, monto: c.planillaDesa.monto },
+        { concepto: "Planilla de testing: columna Importe Fact Test", sgr: c.planillaTest.sgr, monto: c.planillaTest.monto },
+        { concepto: "Cartera en curso", sgr: c.planillaDesa.sgr + c.planillaTest.sgr, monto: c.planillaDesa.monto + c.planillaTest.monto },
         { concepto: "Más: implementados en el mes (planilla de facturación)", sgr: c.implementados.sgr, monto: c.implementados.monto },
         { concepto: "Total de la proyección", sgr: c.total.sgr, monto: c.total.monto },
         { concepto: "Reparto: ya entregado en el mes en curso", sgr: de("entregado").length, monto: monto(de("entregado")) },
@@ -533,10 +531,12 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
         { concepto: "Reparto: no iniciados", sgr: de("no_iniciado").length, monto: monto(de("no_iniciado")) },
         { concepto: "Reparto: sin fecha vigente", sgr: de("sin_fecha").length, monto: monto(de("sin_fecha")) },
         { concepto: "Reparto: entregados en meses anteriores, sin implementar", sgr: de("entregado_antes").length, monto: monto(de("entregado_antes")) },
+        { concepto: "No se toma: planilla de desarrollo, columna Importe Fact Test", sgr: c.noTomadoDesa.sgr, monto: c.noTomadoDesa.monto },
+        { concepto: "No se toma: planilla de testing, columna Importe Fact Desa", sgr: c.noTomadoTest.sgr, monto: c.noTomadoTest.monto },
       ];
       return una({ id: "conciliacion", titulo: "Conciliación con las planillas",
         columnas: cols(["concepto", "Concepto", "texto"], ["sgr", "SGR", "entero"], ["monto", "Importe (Gs.)", "gs"]), filas,
-        nota: "Los SGR sin importe suman cero. Los entregados en meses anteriores siguen en las planillas porque todavía no se implementaron." });
+        nota: "De cada planilla se toma solo el importe de su equipo. Los entregados en meses anteriores siguen en las planillas porque todavía no se implementaron." });
     } },
     { id: "detalle", titulo: "Detalle por SGR", construir: async () => {
       const p = await datos();

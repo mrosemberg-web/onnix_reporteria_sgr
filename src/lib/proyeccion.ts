@@ -8,7 +8,10 @@ import "server-only";
 // Se usa la entrega corregida por pausas, en días hábiles. Si el SGR todavía está en
 // desarrollo y necesita testing, el fin de testing se estima: entrega de desarrollo +
 // días hábiles de testing (importe de testing ÷ tarifa ÷ 8 h).
-// El importe de desarrollo se asigna al equipo de Desarrollo y el de testing al de Testing.
+// Importes: las dos planillas traen el importe de desarrollo y el de testing de cada SGR, pero
+// de la planilla de DESARROLLO solo se toma el importe de desarrollo y de la de TESTING solo
+// el de testing. Así cada equipo cuenta lo suyo y nada se suma dos veces. Los implementados
+// (planilla de facturación) aportan los dos importes, porque ya se entregaron completos.
 import { sql } from "./db";
 import { aplicarFiltros, cargarSeguimiento, type FiltrosSeguimiento } from "./seguimiento";
 import { aIso, fechaMs, sumarHabiles, type Analisis } from "./seguimiento-calculo";
@@ -30,6 +33,8 @@ export type ItemProyeccion = {
   asunto: string | null;
   escenario: Escenario;
   origen: "en_curso" | "implementado";
+  /** Planilla de la que sale (null: implementado, planilla de facturación). */
+  fase: "desa" | "test" | null;
   situacion: string;            // fase y estado actual, en texto
   responsable: string;
   usuarios: string[];
@@ -62,12 +67,16 @@ function clasificar(fecha: string | null, corte: string, anioCorte: number): { d
 }
 
 function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<string>): ItemProyeccion | null {
-  const desa = a.importe_desa ?? 0, test = a.importe_test ?? 0;
-  const esc = escenarioDe(desa, test);
+  // Los dos importes del SGR definen el escenario (qué fecha manda) y los días de testing a estimar…
+  const impDesa = a.importe_desa ?? 0, impTest = a.importe_test ?? 0;
+  const esc = escenarioDe(impDesa, impTest);
   if (!esc || a.etapa === "sin_asignacion") return null;
+  // …pero cada planilla aporta solo el importe de su equipo.
+  const desa = a.fase === "desa" ? impDesa : 0, test = a.fase === "test" ? impTest : 0;
+  if (desa + test === 0) return null;
   const base = esc === 2 ? "fin_desarrollo" : "fin_testing";
   const comun = {
-    id_req: a.id_req, asunto: a.asunto, escenario: esc, origen: "en_curso" as const,
+    id_req: a.id_req, asunto: a.asunto, escenario: esc, origen: "en_curso" as const, fase: a.fase as "desa" | "test" | null,
     situacion: `${a.fase === "desa" ? "Desarrollo" : "Testing"}: ${a.estado ?? ""}`, responsable: a.nombre ?? a.usuario,
     usuarios: [a.usuario], lider: a.lider, tipo: a.tipo_servicio, base: base as ItemProyeccion["base"], desa, test,
     desestimado: false, descuento: null, corrido: false,
@@ -96,7 +105,7 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
     // En desarrollo pero manda el fin de testing: se estima.
     const finDesa = finalizado ? a.fecha_estado : a.entregaCorregida;
     const ms = fechaMs(finDesa);
-    fecha = ms == null ? null : aIso(sumarHabiles(ms, Math.max(1, Math.ceil(test / TARIFA_TEST_HORA / 8)), fer));
+    fecha = ms == null ? null : aIso(sumarHabiles(ms, Math.max(1, Math.ceil(impTest / TARIFA_TEST_HORA / 8)), fer));
     estimada = fecha != null;
   }
   return { ...comun, fecha, estimada, ...clasificar(fecha, corte, anioCorte) };
@@ -131,18 +140,15 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
   const anioCorte = +corte.slice(0, 4);
   const inicioMes = `${corte.slice(0, 7)}-01`;
 
-  // Un SGR que figura en las dos planillas (desarrollo y testing) se cuenta una sola vez: manda la de testing.
   const filtrados = aplicarFiltros(datos.analisis, { ...f, etapas: [], situaciones: [] }).filter((a) => a.etapa !== "sin_asignacion");
-  const enTesting = new Set(filtrados.filter((a) => a.fase === "test").map((a) => a.id_req));
-  const repetidos = filtrados.filter((a) => a.fase === "desa" && enTesting.has(a.id_req));
   const enCurso = filtrados
-    .filter((a) => !(a.fase === "desa" && enTesting.has(a.id_req)))
     .map((a) => desdeEnCurso(a, corte, anioCorte, datos.feriados))
     .filter((x): x is ItemProyeccion => x != null);
 
   // Conciliación contra las planillas en curso (con los mismos filtros).
-  const importe = (l: typeof filtrados) => l.reduce((s, a) => s + (a.importe_total ?? 0), 0);
   const planillaDesa = filtrados.filter((a) => a.fase === "desa"), planillaTest = filtrados.filter((a) => a.fase === "test");
+  const col = (l: typeof filtrados, k: "importe_desa" | "importe_test") => l.reduce((s, a) => s + (a[k] ?? 0), 0);
+  const conImporte = (l: typeof filtrados, k: "importe_desa" | "importe_test") => l.filter((a) => (a[k] ?? 0) > 0).length;
 
   // Implementados cuya fecha que manda cayó en el mes actual (hasta la fecha de corte).
   const historicos = await sql<FilaHistorica[]>`
@@ -164,7 +170,7 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
       const esc: Escenario = h.servicio === "desa_test" ? 1 : h.servicio === "solo_desa" ? 2 : 3;
       const usuarios = [h.asignado_a, h.asignado_testing].filter((x): x is string => !!x);
       return {
-        id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const,
+        id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const, fase: null,
         situacion: h.desestimado ? "Desestimado por el cliente (cuenta como entregado)" : "Implementado",
         desestimado: h.desestimado, descuento: h.desestimado && h.descuento > 0 ? h.descuento : null, corrido: false,
         responsable: usuarios.join(" / "), usuarios, lider: usuarios.map((u) => lideres.get(u)).find(Boolean) ?? null,
@@ -215,10 +221,12 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
   const corridos = enCurso.filter((i) => i.corrido);
   const montoItems = (l: ItemProyeccion[]) => l.reduce((s, i) => s + i.desa + i.test, 0);
   const conciliacion = {
-    planillaDesa: { sgr: planillaDesa.length, monto: importe(planillaDesa) },
-    planillaTest: { sgr: planillaTest.length, monto: importe(planillaTest) },
-    repetidos: { sgr: repetidos.length, monto: importe(repetidos) },
-    sinImporte: { sgr: filtrados.filter((a) => !(a.fase === "desa" && enTesting.has(a.id_req)) && (a.importe_desa ?? 0) + (a.importe_test ?? 0) === 0).length, monto: 0 },
+    // Lo que se toma de cada planilla: solo la columna de su equipo.
+    planillaDesa: { filas: planillaDesa.length, sgr: conImporte(planillaDesa, "importe_desa"), monto: col(planillaDesa, "importe_desa") },
+    planillaTest: { filas: planillaTest.length, sgr: conImporte(planillaTest, "importe_test"), monto: col(planillaTest, "importe_test") },
+    // Lo que NO se toma: la columna del otro equipo en cada planilla.
+    noTomadoDesa: { sgr: conImporte(planillaDesa, "importe_test"), monto: col(planillaDesa, "importe_test") },
+    noTomadoTest: { sgr: conImporte(planillaTest, "importe_desa"), monto: col(planillaTest, "importe_desa") },
     implementados: { sgr: implementados.length, monto: montoItems(implementados) },
     total: { sgr: items.length, monto: montoItems(items) },
   };
