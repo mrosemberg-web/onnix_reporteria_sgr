@@ -36,6 +36,9 @@ export function lecturaSeguimiento(items: Analisis[]): string[] {
     out.push(`En el atraso por ejecución, ${partes.join("; ")}.`);
   }
 
+  if (r.inicioFaltante) {
+    out.push(`Revisar datos: ${num(r.inicioFaltante)} SGR tienen entrega estimada pero no fecha de inicio. Se tratan como iniciados; el avance del plazo no se puede calcular.`);
+  }
   const cliente = sgr.filter((a) => a.etapa === "cliente" && a.diasEnEstado != null);
   if (cliente.length) {
     const mas = [...cliente].sort((a, b) => (b.diasEnEstado ?? 0) - (a.diasEnEstado ?? 0))[0];
@@ -59,8 +62,9 @@ export function lecturaSeguimiento(items: Analisis[]): string[] {
   }
 
   const pausa = sgr.filter((a) => a.etapa === "pausa");
+  const conDias = pausa.filter((a) => a.diasEnEstado != null);
   if (pausa.length) {
-    out.push(`${num(pausa.length)} SGR están en pausa sin indicar el motivo (en promedio ${dias(pausa.reduce((s, a) => s + (a.diasEnEstado ?? 0), 0) / pausa.length)}). Registrar si esperan al cliente permitiría separar ese tiempo de la ejecución.`);
+    out.push(`${num(pausa.length)} SGR están en pausa sin indicar el motivo ${conDias.length ? ` (en promedio ${dias(conDias.reduce((x, a) => x + a.diasEnEstado!, 0) / conDias.length)})` : ""}. Registrar si esperan al cliente permitiría separar ese tiempo de la ejecución.`);
   }
 
   if (r.excedidos) out.push(`${num(r.excedidos)} SGR ya superaron sus horas presupuestadas, por ${horas(r.horasExcedidas)} en total.`);

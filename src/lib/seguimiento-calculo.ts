@@ -106,8 +106,10 @@ export type Analisis = FilaSeguimiento & {
   horasExcedidas: number;
   /** Días hábiles de la detención actual que no figuran en las horas pausadas (dato a revisar). */
   pausaSinRegistrar: number;
-  /** Tiene fecha de inicio (o ya terminó su fase). Sin inicio no hay plazo corriendo. */
+  /** Tiene fecha de inicio o entrega estimada (o ya terminó su fase). Sin eso no hay plazo corriendo. */
   iniciado: boolean;
+  /** Dato a revisar: tiene entrega estimada pero le falta la fecha de inicio. */
+  inicioFaltante: boolean;
   /** Horas cargadas antes de iniciar (análisis, presupuesto): no cuentan contra el presupuesto. */
   horasAntesDeIniciar: number;
   /** Solo testing: desarrollador reconocido en la planilla de desarrollo (usuario), o null. */
@@ -155,8 +157,10 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   const N = E != null ? sumarHabiles(E, corrido, fer) : null;
   const entregaCorregida = N != null ? iso(N) : null;
   const etapaEstado: Etapa = f.id_req === "0" ? "sin_asignacion" : etapaDe(f.estado);
-  // No iniciado: sin fecha de inicio y sin haber terminado la fase. No hay plazo corriendo.
-  const iniciado = I != null || etapaEstado === "finalizado";
+  // No iniciado: sin fecha de inicio, sin entrega estimada y sin haber terminado la fase. No hay plazo corriendo.
+  // Si falta la fecha de inicio pero hay entrega estimada, el plazo existe: se trata como iniciado y se avisa.
+  const iniciado = I != null || E != null || etapaEstado === "finalizado";
+  const inicioFaltante = I == null && E != null && etapaEstado !== "finalizado";
   const etapa: Etapa = etapaEstado === "cliente" && !iniciado ? "cliente_sin_iniciar" : etapaEstado;
   const lider = f.team_leader ?? (lideres.has(f.usuario) ? f.usuario : "Sin líder");
   const causas: Record<Causa, number> = { pausas: 0, cliente: 0, devoluciones: 0, pausa: 0, ejecucion: 0 };
@@ -169,7 +173,7 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   const detenido = etapa === "cliente" || etapa === "devuelto" || etapa === "pausa";
   const pausaSinRegistrar = detenido && iniciado && S != null
     ? Math.max(0, Math.floor(habilesDespues(S, C, fer) - diasPausa)) : 0;
-  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida, iniciado, horasAntesDeIniciar,
+  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida, iniciado, inicioFaltante, horasAntesDeIniciar,
     devUsuario: null, devNombre: f.desarrollador ?? null, devExterno: (f.importe_desa ?? 0) === 0 };
   if (etapa === "sin_asignacion") {
     return { ...base, situacion: "sin_asignacion", atraso: null, causaPrincipal: null, avance: null, ejecucion: null };
@@ -246,6 +250,7 @@ export type ResumenGrupo = {
   /** Esperando al cliente antes de iniciar. */
   esperandoClienteSinIniciar: number;
   noIniciados: number;
+  inicioFaltante: number;
   horasAntesDeIniciar: number;
   devoluciones: number;
   sgrConDevolucion: number;
@@ -268,7 +273,7 @@ export function resumir(items: Analisis[]): ResumenGrupo {
   const r: ResumenGrupo = {
     sgr: 0, porEtapa: Object.fromEntries(Object.keys(ETAPAS).map((k) => [k, 0])) as Record<Etapa, number>,
     atrasados: 0, diasAtraso: 0, causas: { pausas: 0, cliente: 0, devoluciones: 0, pausa: 0, ejecucion: 0 },
-    esperandoCliente: 0, esperandoClienteSinIniciar: 0, noIniciados: 0, horasAntesDeIniciar: 0, devoluciones: 0, sgrConDevolucion: 0, devueltosAhora: 0, horasAyer: 0, horasTrab: 0, horasPresu: 0,
+    esperandoCliente: 0, esperandoClienteSinIniciar: 0, noIniciados: 0, inicioFaltante: 0, horasAntesDeIniciar: 0, devoluciones: 0, sgrConDevolucion: 0, devueltosAhora: 0, horasAyer: 0, horasTrab: 0, horasPresu: 0,
     trabConPresu: 0, presuConTrab: 0, excedidos: 0, horasExcedidas: 0, sinPlan: 0, enAnalisis: 0, pausasSinRegistrar: 0, importe: 0,
   };
   for (const a of items) {
@@ -287,6 +292,7 @@ export function resumir(items: Analisis[]): ResumenGrupo {
     if (a.etapa === "cliente") r.esperandoCliente++;
     if (a.etapa === "cliente_sin_iniciar") r.esperandoClienteSinIniciar++;
     if (!a.iniciado) { r.noIniciados++; r.horasAntesDeIniciar += a.horasAntesDeIniciar; }
+    if (a.inicioFaltante) r.inicioFaltante++;
     if (a.etapa === "devuelto") r.devueltosAhora++;
     r.devoluciones += a.devoluciones ?? 0;
     if ((a.devoluciones ?? 0) > 0) r.sgrConDevolucion++;
@@ -364,14 +370,17 @@ export function devolucionesPorDesarrollador(itemsTesting: Analisis[]): Devoluci
   return [...mapa.values()].sort((a, b) => Number(a.externo) - Number(b.externo) || b.devoluciones - a.devoluciones || b.atraso - a.atraso);
 }
 
-/** Importe que aporta una fila: de la planilla de desarrollo, el de desarrollo; de la de testing, el de testing. */
+/**
+ * Importe que aporta una fila. Planilla de desarrollo: solo el importe de desarrollo.
+ * Planilla de testing: el de testing y también el de desarrollo del SGR (entra con el fin de testing).
+ */
 export const importePropio = (a: { fase: string; importe_desa: number | null; importe_test: number | null }) =>
-  (a.fase === "desa" ? a.importe_desa : a.importe_test) ?? 0;
+  (a.importe_desa ?? 0) + (a.fase === "test" ? a.importe_test ?? 0 : 0);
 
-/** Cartera en curso: importe de desarrollo de la planilla de desarrollo + importe de testing de la planilla de testing. */
+/** Cartera en curso: desarrollo de las dos planillas + testing de la planilla de testing. */
 export function cartera(items: Analisis[]) {
   const l = items.filter((a) => a.etapa !== "sin_asignacion");
-  const desa = l.filter((a) => a.fase === "desa").reduce((s, a) => s + (a.importe_desa ?? 0), 0);
+  const desa = l.reduce((s, a) => s + (a.importe_desa ?? 0), 0);
   const test = l.filter((a) => a.fase === "test").reduce((s, a) => s + (a.importe_test ?? 0), 0);
   return { sgr: l.filter((a) => importePropio(a) > 0).length, monto: desa + test, desa, test };
 }

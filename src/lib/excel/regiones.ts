@@ -283,13 +283,13 @@ const colsDetalleSeg = cols(
   ["devoluciones", "Devoluciones al desarrollador", "entero"], ["ayer", "Horas ayer", "horas"], ["trab", "Horas trabajadas", "horas"],
   ["presu", "Horas presupuestadas", "horas"], ["antes_iniciar", "Horas antes de iniciar", "horas"], ["consumo", "Horas usadas", "pct"], ["excedidas", "Horas excedidas", "horas"],
   ["pausadas", "Horas pausadas de la fase", "horas"], ["otras", "Otras horas pausadas", "horas"],
-  ["sin_registrar", "Días detenido sin pausa registrada", "entero"], ["importe", "Importe del equipo (Gs.)", "gs"],
+  ["sin_registrar", "Días detenido sin pausa registrada", "entero"], ["importe", "Importe considerado (Gs.)", "gs"],
 );
 const filaSeg = (a: Analisis) => ({
   sgr: a.id_req, fase: FASE[a.fase], asunto: a.asunto, responsable: a.nombre ?? a.usuario, usuario: a.usuario, lider: a.lider,
   desarrollador: a.fase === "test" ? a.devNombre : null, dev_cliente: a.fase === "test" && a.devNombre ? (a.devExterno ? "Sí" : "No") : null,
   tservicio: a.tipo_servicio, estado: a.estado, etapa: ETAPAS[a.etapa].nombre, situacion: SITUACIONES[a.situacion].nombre,
-  fecha_estado: a.fecha_estado, dias_estado: a.diasEnEstado, iniciado: a.iniciado ? "Sí" : "No",
+  fecha_estado: a.fecha_estado, dias_estado: a.diasEnEstado, iniciado: a.iniciado ? (a.inicioFaltante ? "Sí (falta fecha de inicio)" : "Sí") : "No",
   antes_iniciar: a.horasAntesDeIniciar || null, inicio: a.fecha_inicio, estimada: a.entrega_estimada, corregida: a.entregaCorregida,
   atraso: a.atraso, causa: a.causaPrincipal ? CAUSAS[a.causaPrincipal].nombre : null,
   c_pausas: a.atraso ? a.causas.pausas : null, c_cliente: a.atraso ? a.causas.cliente : null, c_dev: a.atraso ? a.causas.devoluciones : null,
@@ -520,8 +520,9 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
       const de = (d: string, f?: (m: string | null) => boolean) => p.items.filter((i) => i.destino === d && (!f || f(i.mes)));
       const filas = [
         { concepto: "Planilla de desarrollo: columna Importe Fact Desa", sgr: c.planillaDesa.sgr, monto: c.planillaDesa.monto },
+        { concepto: "Planilla de testing: columna Importe Fact Desa (desarrollo de SGR ya en testing)", sgr: c.planillaTestDesa.sgr, monto: c.planillaTestDesa.monto },
         { concepto: "Planilla de testing: columna Importe Fact Test", sgr: c.planillaTest.sgr, monto: c.planillaTest.monto },
-        { concepto: "Cartera en curso", sgr: c.planillaDesa.sgr + c.planillaTest.sgr, monto: c.planillaDesa.monto + c.planillaTest.monto },
+        { concepto: "Cartera en curso", sgr: p.items.filter((i) => i.origen === "en_curso").length, monto: c.planillaDesa.monto + c.planillaTestDesa.monto + c.planillaTest.monto },
         { concepto: "Más: implementados en el mes (planilla de facturación)", sgr: c.implementados.sgr, monto: c.implementados.monto },
         { concepto: "Total de la proyección", sgr: c.total.sgr, monto: c.total.monto },
         { concepto: "Reparto: ya entregado en el mes en curso", sgr: de("entregado").length, monto: monto(de("entregado")) },
@@ -531,12 +532,11 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
         { concepto: "Reparto: no iniciados", sgr: de("no_iniciado").length, monto: monto(de("no_iniciado")) },
         { concepto: "Reparto: sin fecha vigente", sgr: de("sin_fecha").length, monto: monto(de("sin_fecha")) },
         { concepto: "Reparto: entregados en meses anteriores, sin implementar", sgr: de("entregado_antes").length, monto: monto(de("entregado_antes")) },
-        { concepto: "No se toma: planilla de desarrollo, columna Importe Fact Test", sgr: c.noTomadoDesa.sgr, monto: c.noTomadoDesa.monto },
-        { concepto: "No se toma: planilla de testing, columna Importe Fact Desa", sgr: c.noTomadoTest.sgr, monto: c.noTomadoTest.monto },
+        { concepto: "No se toma todavía: planilla de desarrollo, columna Importe Fact Test", sgr: c.noTomadoDesa.sgr, monto: c.noTomadoDesa.monto },
       ];
       return una({ id: "conciliacion", titulo: "Conciliación con las planillas",
         columnas: cols(["concepto", "Concepto", "texto"], ["sgr", "SGR", "entero"], ["monto", "Importe (Gs.)", "gs"]), filas,
-        nota: "De cada planilla se toma solo el importe de su equipo. Los entregados en meses anteriores siguen en las planillas porque todavía no se implementaron." });
+        nota: "Planilla de desarrollo: solo el importe de desarrollo. Planilla de testing: el de testing y el de desarrollo, en el mes de fin de testing." });
     } },
     { id: "detalle", titulo: "Detalle por SGR", construir: async () => {
       const p = await datos();

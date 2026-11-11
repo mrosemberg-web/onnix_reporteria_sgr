@@ -35,6 +35,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
   const venc = p.vencidos.desa + p.vencidos.test, sinF = p.sinFecha.desa + p.sinFecha.test;
   const noIni = p.noIniciados.desa + p.noIniciados.test;
   const c = p.conciliacion;
+  const enCursoSgr = p.items.filter((i) => i.origen === "en_curso").length;
   const cuenta = (d: string, mes?: (m: string | null) => boolean) => p.items.filter((i) => i.destino === d && (!mes || mes(i.mes)));
   const monto = (l: ItemProyeccion[]) => l.reduce((s, i) => s + i.desa + i.test, 0);
   const reparto: [string, number, number][] = [
@@ -148,7 +149,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
           </table>
         </div>
         <p className="debil" style={{ marginTop: 10, fontSize: "0.82rem" }}>
-          De la planilla de desarrollo se toma solo el importe de desarrollo y de la de testing solo el de testing; cada uno entra en un solo mes.
+          De la planilla de desarrollo se toma solo el importe de desarrollo. De la de testing se toman el de testing y el de desarrollo, que entran juntos en el mes de fin de testing.
           Para los SGR que siguen en desarrollo y necesitan testing, el fin de testing se estima sumando a su entrega de desarrollo los días
           hábiles de testing que surgen del importe (÷ Gs. {num(TARIFA_TEST_HORA)} por hora ÷ 8 horas). Ya entregado en el mes en curso: implementados
           (incluidos los desestimados por el cliente, con el importe de la planilla, que ya refleja el descuento acordado) y SGR en
@@ -180,22 +181,23 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
             <thead><tr><th>Concepto</th><th className="n">SGR</th><th className="n">Importe (Gs.)</th></tr></thead>
             <tbody>
               <tr><td>Planilla de desarrollo: columna «Importe Fact Desa»</td><td className="n">{num(c.planillaDesa.sgr)}</td><td className="n">{gs(c.planillaDesa.monto)}</td></tr>
+              <tr><td>Planilla de testing: columna «Importe Fact Desa» (desarrollo de SGR ya en testing)</td><td className="n">{num(c.planillaTestDesa.sgr)}</td><td className="n">{gs(c.planillaTestDesa.monto)}</td></tr>
               <tr><td>Planilla de testing: columna «Importe Fact Test»</td><td className="n">{num(c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaTest.monto)}</td></tr>
-              <tr className="subtotal"><td>Cartera en curso</td><td className="n">{num(c.planillaDesa.sgr + c.planillaTest.sgr)}</td><td className="n">{gs(c.planillaDesa.monto + c.planillaTest.monto)}</td></tr>
+              <tr className="subtotal"><td>Cartera en curso</td><td className="n">{num(enCursoSgr)}</td><td className="n">{gs(c.planillaDesa.monto + c.planillaTestDesa.monto + c.planillaTest.monto)}</td></tr>
               <tr><td>Más: implementados en el mes, según la planilla de facturación</td><td className="n">{num(c.implementados.sgr)}</td><td className="n">+{gs(c.implementados.monto)}</td></tr>
               <tr className="subtotal"><td>Total de la proyección</td><td className="n">{num(c.total.sgr)}</td><td className="n">{gs(c.total.monto)}</td></tr>
               <tr className="grupo"><td colSpan={3}>Se reparte en</td></tr>
               {reparto.map(([t, n, m]) => <tr key={t}><td>{t}</td><td className="n">{num(n)}</td><td className="n">{gs(m)}</td></tr>)}
-              <tr className="grupo"><td colSpan={3}>No se toma, para no contar dos veces</td></tr>
-              <tr className="debil"><td>Planilla de desarrollo: columna «Importe Fact Test»</td><td className="n">{num(c.noTomadoDesa.sgr)}</td><td className="n">{gs(c.noTomadoDesa.monto)}</td></tr>
-              <tr className="debil"><td>Planilla de testing: columna «Importe Fact Desa»</td><td className="n">{num(c.noTomadoTest.sgr)}</td><td className="n">{gs(c.noTomadoTest.monto)}</td></tr>
+              <tr className="grupo"><td colSpan={3}>No se toma todavía</td></tr>
+              <tr className="debil"><td>Planilla de desarrollo: columna «Importe Fact Test» (testing de SGR que siguen en desarrollo)</td><td className="n">{num(c.noTomadoDesa.sgr)}</td><td className="n">{gs(c.noTomadoDesa.monto)}</td></tr>
             </tbody>
           </table>
         </div>
         <p className="debil" style={{ marginTop: 10, fontSize: "0.82rem" }}>
-          De cada planilla se toma solo el importe de su equipo: de la de desarrollo, el de desarrollo; de la de testing, el de testing.
-          La columna «SGR» cuenta los que tienen ese importe. Los entregados en meses anteriores terminaron la fase que manda pero siguen en
-          las planillas porque todavía no se implementaron: ya contaron en su mes y no se vuelven a proyectar.
+          De la planilla de desarrollo se toma solo el importe de desarrollo; el de testing de esos SGR entrará cuando pasen a la planilla
+          de testing. De la planilla de testing se toman los dos: el de testing y el de desarrollo, que entran juntos en el mes de fin de
+          testing. Los entregados en meses anteriores terminaron la fase que manda pero siguen en las planillas porque todavía no se
+          implementaron: ya contaron en su mes y no se vuelven a proyectar.
         </p>
       </section>
 

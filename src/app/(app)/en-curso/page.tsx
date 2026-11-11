@@ -50,13 +50,13 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
         <Indicador nombre="Días hábiles de atraso" valor={num(r.diasAtraso)}
           nota={r.diasAtraso ? `${pct((r.causas.pausas + r.causas.cliente) / r.diasAtraso)} por cliente y pausas anteriores; ${pct(r.causas.ejecucion / r.diasAtraso)} por ejecución` : undefined} />
         <Indicador nombre="Esperando al cliente" valor={num(cliente.length)}
-          nota={[cliente.length ? `ya iniciados; mediana de ${dias(mediana(cliente.map((a) => a.diasEnEstado ?? 0)))} en espera` : "ya iniciados",
+          nota={[cliente.length ? `ya iniciados; mediana de ${dias(mediana(cliente.filter((a) => a.diasEnEstado != null).map((a) => a.diasEnEstado!)))} en espera` : "ya iniciados",
             clienteSinIniciar.length ? `+${num(clienteSinIniciar.length)} antes de iniciar` : ""].filter(Boolean).join("; ")} />
         <Indicador nombre="Devoluciones de testing" valor={num(r.devoluciones)} nota={`en ${num(r.sgrConDevolucion)} SGR; ${num(r.devueltosAhora)} devueltos hoy`} />
         <Indicador nombre="Horas cargadas ayer" valor={horas(r.horasAyer)}
           nota={`${num(personas.size - sinHorasAyer.length)} de ${num(personas.size)} personas`} />
         <Indicador nombre="Cartera en curso" valor={gsCorto(cart.monto)}
-          nota={`${gsCorto(cart.desa)} de desarrollo (planilla de desarrollo) + ${gsCorto(cart.test)} de testing (planilla de testing)`} />
+          nota={`${gsCorto(cart.desa)} de desarrollo + ${gsCorto(cart.test)} de testing; sin el testing de los SGR que siguen en desarrollo`} />
       </section>
 
       <Lectura parrafos={lecturaSeguimiento(items)} />

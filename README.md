@@ -49,6 +49,21 @@ Cada archivo empieza con una hoja **Filtros**: reporte, filtros aplicados, datos
 
 Los archivos se generan en el servidor (`/api/excel`) con exceljs y requieren sesión. Las pantallas de Administración no se exportan.
 
+## Campos vacíos en las planillas
+
+Un campo vacío no es lo mismo que un cero, y el sistema los distingue donde importa:
+
+- **Horas presupuestadas vacías** (en curso): el SGR no tiene presupuesto. No se calcula «horas usadas» ni cuenta como excedido.
+- **Importes vacíos**: no suman. Un SGR sin importe no entra en la Cartera ni en la Proyección.
+- **Fechas vacías:**
+  - Sin entrega estimada no hay atraso («Sin fecha comprometida»).
+  - Sin fecha de inicio ni entrega, el SGR es «no iniciado».
+  - Sin fecha de estado no se calculan los días en el estado, y ese SGR no entra en medianas ni promedios.
+  - Un implementado sin fecha de fin de fase usa la fecha de implementación para la Proyección.
+- **Textos vacíos**: persona sin nombre → se muestra el usuario; sin líder → «Sin líder»; estado vacío o desconocido → «Otro estado»; desarrollador o tester vacío en implementados → «Sin asignar».
+- **Horas trabajadas, horas pausadas y devoluciones vacías** se toman como cero, que es lo que significan en el sistema de origen.
+- **Planilla de facturación:** una fila sin fecha de implementación se carga con advertencia y no aparece en los reportes por año. Una fila sin «Id Req» hace que se rechace la planilla.
+
 ## Diagnóstico
 
 Abrí `https://<tu-app>/api/salud` (no requiere sesión). Devuelve un JSON que indica:
@@ -165,7 +180,7 @@ Los SGR en análisis o presupuesto (incluido *Presupuesto Aprobado*) **no cuenta
 
 Si un SGR detenido tiene menos horas pausadas que los días hábiles que lleva en el estado, se marca **Revisar pausa** y la lectura lo advierte, porque ese tiempo sin registrar termina contándose como ejecución.
 
-**SGR no iniciados.** Un SGR sin fecha de inicio, que no haya terminado su fase, se considera **no iniciado**. Es el caso de los que están en análisis, en presupuesto, en cola o esperando al cliente para arrancar. Como no tienen plazo corriendo:
+**SGR no iniciados.** Un SGR sin fecha de inicio ni entrega estimada, que no haya terminado su fase, se considera **no iniciado**. Si le falta la fecha de inicio pero tiene entrega estimada, se trata como iniciado y la lectura lo marca como dato a revisar. Es el caso de los que están en análisis, en presupuesto, en cola o esperando al cliente para arrancar. Como no tienen plazo corriendo:
 
 - no suman atraso ni disparan «Revisar pausa»;
 - sus horas cargadas (análisis o presupuesto) no se comparan con el presupuesto ni cuentan como excedidas, sino que se informan aparte como «horas antes de iniciar»;
@@ -201,12 +216,15 @@ Sin la columna, las de devoluciones se ocultan en Desarrollo en curso y la nota 
   - *desarrollo y testing*: fin de testing (desarrollo y testing van a ese mes);
   - *solo desarrollo*: fin de desarrollo;
   - *solo testing de un desarrollo del cliente*: fin de testing.
-- **Importes de cada planilla.** Las dos planillas en curso traen el importe de desarrollo y el de testing de cada SGR, pero **de la planilla de desarrollo se toma solo «Importe Fact Desa» y de la de testing solo «Importe Fact Test»**. Así cada equipo cuenta lo suyo y nada se suma dos veces. Los dos importes del SGR sí se usan para decidir el escenario (qué fecha manda). Los implementados del mes, que vienen de la planilla de facturación, aportan los dos importes.
+- **Importes de cada planilla.** Las dos planillas en curso traen el importe de desarrollo y el de testing de cada SGR:
+  - **Planilla de desarrollo:** se toma solo «Importe Fact Desa». El importe de testing de esos SGR no se cuenta todavía; entra cuando el SGR pasa a la planilla de testing.
+  - **Planilla de testing:** se toman los dos. «Importe Fact Test» va a la fila Testing y «Importe Fact Desa» a la fila Desarrollo, ambos en el mes de fin de testing.
+  - **Implementados del mes** (planilla de facturación): aportan los dos importes.
 - **Fecha usada.** Es la entrega corregida por pausas, en días hábiles.
 - **Fechas estimadas.** Si un SGR sigue en desarrollo pero necesita testing, el fin de testing se estima: entrega de desarrollo + importe de testing ÷ Gs. 200.000 por hora ÷ 8 horas por día hábil. Se marca como «Estimada».
 - **Ya entregado en el mes en curso.** Son los implementados de la planilla de facturación cuya fecha que manda cayó en el mes, incluidos los desestimados con su importe, y los SGR en «Testing Finalizado» o «Desarrollo Finalizado» con fecha de estado en el mes, hasta la fecha de corte.
 - **Fecha de corte del mes.** Arriba de la pantalla se elige hasta qué fecha se considera entregable dentro de un mes. Lo estimado para después de esa fecha, dentro del mismo mes, pasa al mes siguiente; si es diciembre, pasa al año siguiente. Por ejemplo, con corte al 28/10/2026, un SGR estimado para el 29/10 pasa a noviembre. Por defecto es el último día del mes en curso, así que no cambia nada. La fecha queda en la URL (`?hasta=AAAA-MM-DD`), se aplica también al PDF y al Excel, y los SGR que cambian de mes llevan la marca «Pasa al mes siguiente». Lo ya entregado no se mueve. Si la fecha de corte ya pasó (hoy es posterior), el mes queda **cerrado**: solo cuenta lo entregado y todo lo que quedaba por entregar en ese mes pasa al siguiente, con la marca «Pasa al mes siguiente: mes cerrado».
-- **Conciliación con las planillas.** Un panel, también exportable a Excel, muestra lo que se toma de cada planilla (la columna de su equipo), cuya suma es la «Cartera en curso» del Resumen en curso. Le suma los implementados del mes según la planilla de facturación y llega al total de la proyección. Debajo muestra cómo se reparte: entregado en el mes, por entregar hasta diciembre, año siguiente, vencidos, no iniciados, sin fecha vigente y entregados en meses anteriores todavía sin implementar. Al final informa lo que **no** se toma: la columna del otro equipo en cada planilla.
+- **Conciliación con las planillas.** Un panel, también exportable a Excel, muestra lo que se toma de cada planilla, cuya suma es la «Cartera en curso» del Resumen en curso. Le suma los implementados del mes según la planilla de facturación y llega al total de la proyección. Debajo muestra cómo se reparte: entregado en el mes, por entregar hasta diciembre, año siguiente, vencidos, no iniciados, sin fecha vigente y entregados en meses anteriores todavía sin implementar. Al final informa lo que todavía **no** se toma: el importe de testing de los SGR que siguen en la planilla de desarrollo.
 - **Montos que no entran en ningún mes.** Se muestran aparte los **vencidos sin entregar** (fecha pasada y todavía en curso) y los **sin fecha vigente** (sin estimación o en análisis de alcance).
 
 ## Estructura

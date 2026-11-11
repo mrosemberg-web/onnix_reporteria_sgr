@@ -8,10 +8,12 @@ import "server-only";
 // Se usa la entrega corregida por pausas, en días hábiles. Si el SGR todavía está en
 // desarrollo y necesita testing, el fin de testing se estima: entrega de desarrollo +
 // días hábiles de testing (importe de testing ÷ tarifa ÷ 8 h).
-// Importes: las dos planillas traen el importe de desarrollo y el de testing de cada SGR, pero
-// de la planilla de DESARROLLO solo se toma el importe de desarrollo y de la de TESTING solo
-// el de testing. Así cada equipo cuenta lo suyo y nada se suma dos veces. Los implementados
-// (planilla de facturación) aportan los dos importes, porque ya se entregaron completos.
+// Importes: las dos planillas traen el importe de desarrollo y el de testing de cada SGR.
+//  - Planilla de DESARROLLO: se toma solo el importe de desarrollo. El de testing no se cuenta
+//    todavía: entrará cuando el SGR pase a la planilla de testing.
+//  - Planilla de TESTING: se toman los dos. El de testing va a la fila Testing y el de
+//    desarrollo a la fila Desarrollo, ambos en el mes de fin de testing (escenario 1).
+// Así nada se suma dos veces. Los implementados (planilla de facturación) aportan los dos.
 import { sql } from "./db";
 import { aplicarFiltros, cargarSeguimiento, type FiltrosSeguimiento } from "./seguimiento";
 import { aIso, fechaMs, sumarHabiles, type Analisis } from "./seguimiento-calculo";
@@ -69,10 +71,12 @@ function clasificar(fecha: string | null, corte: string, anioCorte: number): { d
 function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<string>): ItemProyeccion | null {
   // Los dos importes del SGR definen el escenario (qué fecha manda) y los días de testing a estimar…
   const impDesa = a.importe_desa ?? 0, impTest = a.importe_test ?? 0;
-  const esc = escenarioDe(impDesa, impTest);
+  // Un SGR de la planilla de testing con importe de desarrollo ya está en testing: manda el fin de testing
+  // aunque su importe de testing venga vacío.
+  const esc: Escenario | null = a.fase === "test" && impDesa > 0 ? 1 : escenarioDe(impDesa, impTest);
   if (!esc || a.etapa === "sin_asignacion") return null;
-  // …pero cada planilla aporta solo el importe de su equipo.
-  const desa = a.fase === "desa" ? impDesa : 0, test = a.fase === "test" ? impTest : 0;
+  // …pero el importe de testing solo se toma de la planilla de testing.
+  const desa = impDesa, test = a.fase === "test" ? impTest : 0;
   if (desa + test === 0) return null;
   const base = esc === 2 ? "fin_desarrollo" : "fin_testing";
   const comun = {
@@ -155,13 +159,13 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
     select id_req, asunto, servicio, estado, asignado_a, asignado_testing, tipo_requerimiento,
            (case when aplica_desa then importe_desa else 0 end)::float8 as desa,
            (case when aplica_test then importe_test else 0 end)::float8 as test,
-           case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end as fecha_fin,
+           coalesce(case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end, implementacion) as fecha_fin,
            desestimado,
            greatest((case when aplica_desa then horas_presu_desa * ${TARIFA_DESA_HORA} - importe_desa else 0 end)
                   + (case when aplica_test then horas_presu_test * ${TARIFA_TEST_HORA} - importe_test else 0 end), 0)::float8 as descuento
     from v_requerimientos
     where entregado and servicio in ('desa_test', 'solo_desa', 'solo_test')
-      and (case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end) between ${inicioMes} and ${corte}`;
+      and coalesce(case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end, implementacion) between ${inicioMes} and ${corte}`;
   const lideres = new Map(datos.analisis.map((a) => [a.usuario, a.lider]));
   const vistos = new Set(enCurso.map((i) => i.id_req));
   const implementados: ItemProyeccion[] = historicos
@@ -221,12 +225,12 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
   const corridos = enCurso.filter((i) => i.corrido);
   const montoItems = (l: ItemProyeccion[]) => l.reduce((s, i) => s + i.desa + i.test, 0);
   const conciliacion = {
-    // Lo que se toma de cada planilla: solo la columna de su equipo.
+    // Lo que se toma de cada planilla.
     planillaDesa: { filas: planillaDesa.length, sgr: conImporte(planillaDesa, "importe_desa"), monto: col(planillaDesa, "importe_desa") },
+    planillaTestDesa: { sgr: conImporte(planillaTest, "importe_desa"), monto: col(planillaTest, "importe_desa") },
     planillaTest: { filas: planillaTest.length, sgr: conImporte(planillaTest, "importe_test"), monto: col(planillaTest, "importe_test") },
-    // Lo que NO se toma: la columna del otro equipo en cada planilla.
+    // Lo que NO se toma: el importe de testing de los SGR que siguen en la planilla de desarrollo.
     noTomadoDesa: { sgr: conImporte(planillaDesa, "importe_test"), monto: col(planillaDesa, "importe_test") },
-    noTomadoTest: { sgr: conImporte(planillaTest, "importe_desa"), monto: col(planillaTest, "importe_desa") },
     implementados: { sgr: implementados.length, monto: montoItems(implementados) },
     total: { sgr: items.length, monto: montoItems(items) },
   };
