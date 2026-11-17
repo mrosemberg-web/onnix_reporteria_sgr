@@ -16,6 +16,7 @@ import {
   resumir, SITUACIONES, type Analisis, type Ejecucion,
 } from "../seguimiento-calculo";
 import { nombreServicio } from "../servicios";
+import { cargarHoras, type HorasPersona } from "../horas";
 import { ESCENARIOS, proyeccion, type ItemProyeccion } from "../proyeccion";
 import { cols, type DefRegion, type PaginaExcel, type Region } from "./tipos";
 
@@ -280,7 +281,7 @@ const colsDetalleSeg = cols(
   ["corregida", "Entrega corregida por pausas", "fecha"], ["atraso", "Atraso (días hábiles)", "entero"], ["causa", "Causa principal", "texto"],
   ["c_pausas", "Pausas anteriores", "entero"], ["c_cliente", "Espera del cliente", "entero"], ["c_dev", "Devoluciones de testing", "entero"],
   ["c_pausa", "Pausa sin motivo", "entero"], ["c_ejec", "Ejecución", "entero"], ["diag", "Diagnóstico de ejecución", "texto"],
-  ["devoluciones", "Devoluciones al desarrollador", "entero"], ["ayer", "Horas ayer", "horas"], ["trab", "Horas trabajadas", "horas"],
+  ["devoluciones", "Devoluciones al desarrollador", "entero"], ["trab", "Horas trabajadas", "horas"],
   ["presu", "Horas presupuestadas", "horas"], ["antes_iniciar", "Horas antes de iniciar", "horas"], ["consumo", "Horas usadas", "pct"], ["excedidas", "Horas excedidas", "horas"],
   ["pausadas", "Horas pausadas de la fase", "horas"], ["otras", "Otras horas pausadas", "horas"],
   ["sin_registrar", "Días detenido sin pausa registrada", "entero"], ["importe", "Importe considerado (Gs.)", "gs"],
@@ -294,7 +295,7 @@ const filaSeg = (a: Analisis) => ({
   atraso: a.atraso, causa: a.causaPrincipal ? CAUSAS[a.causaPrincipal].nombre : null,
   c_pausas: a.atraso ? a.causas.pausas : null, c_cliente: a.atraso ? a.causas.cliente : null, c_dev: a.atraso ? a.causas.devoluciones : null,
   c_pausa: a.atraso ? a.causas.pausa : null, c_ejec: a.atraso ? a.causas.ejecucion : null,
-  diag: a.ejecucion ? EJECUCION[a.ejecucion].nombre : null, devoluciones: a.devoluciones, ayer: a.horas_ayer, trab: a.horas_trab,
+  diag: a.ejecucion ? EJECUCION[a.ejecucion].nombre : null, devoluciones: a.devoluciones, trab: a.horas_trab,
   presu: a.horas_presu, consumo: a.consumo, excedidas: a.horasExcedidas || null, pausadas: a.horas_pausadas_fase,
   otras: a.otras_horas_pausadas, sin_registrar: a.pausaSinRegistrar || null, importe: importePropio(a),
 });
@@ -356,7 +357,7 @@ function paginaEnCurso(items: Analisis[]): DefRegion[] {
   ];
 }
 
-function paginaSeguimientoFase(fz: Fase, items: Analisis[], testing: Analisis[] = []): DefRegion[] {
+function paginaSeguimientoFase(fz: Fase, items: Analisis[], testing: Analisis[] = [], horasDe: Map<string, HorasPersona> = new Map()): DefRegion[] {
   const persona = fz === "desa" ? "Desarrollador" : "Tester";
   const personas = agruparPorPersona(items);
   const devs = fz === "desa" ? devolucionesPorDesarrollador(testing) : [];
@@ -376,14 +377,17 @@ function paginaSeguimientoFase(fz: Fase, items: Analisis[], testing: Analisis[] 
         ...(fz === "desa" ? [["recibidas", "Devoluciones recibidas de testing", "entero"] as [string, string, "entero"]] : []),
         ["atrasados", "Atrasados", "entero"], ["externo", "Atraso externo (cliente y pausas anteriores)", "entero"],
         ["por_dev", fz === "test" ? "Esperando corrección del desarrollador" : "Atraso por devoluciones", "entero"], ["pausa", "Pausa sin motivo", "entero"], ["ejec", "Atraso por ejecución", "entero"],
-        ["ayer", "Horas ayer", "horas"], ["trab", "Horas trabajadas (con presupuesto)", "horas"], ["presu", "Horas presupuestadas", "horas"],
+        ["mes", "Horas del mes (Resumen de horas)", "horas"], ["potencial", "Horas potenciales", "horas"], ["carga", "Carga", "pct"],
+        ["trab", "Horas trabajadas (con presupuesto)", "horas"], ["presu", "Horas presupuestadas", "horas"],
         ["usadas", "Horas usadas", "pct"], ["antes_iniciar", "Horas antes de iniciar (aparte)", "horas"], ["excedidos", "SGR excedidos en horas", "entero"], ["sin_sgr", "Sin SGR asignado", "texto"]),
       filas: personas.map((p) => ({
         persona: p.nombre, usuario: p.usuario, lider: p.lider, sgr: p.r.sgr, activo: p.r.porEtapa.activo, cliente: p.r.esperandoCliente,
         sin_iniciar: p.r.noIniciados, antes_iniciar: p.r.horasAntesDeIniciar,
         devoluciones: p.r.devoluciones, recibidas: devDe.get(p.usuario)?.devoluciones ?? 0, atrasados: p.r.atrasados,
         externo: p.r.causas.pausas + p.r.causas.cliente, por_dev: p.r.causas.devoluciones + (devDe.get(p.usuario)?.atraso ?? 0),
-        pausa: p.r.causas.pausa, ejec: p.r.causas.ejecucion, ayer: p.r.horasAyer, trab: p.r.trabConPresu, presu: p.r.presuConTrab,
+        pausa: p.r.causas.pausa, ejec: p.r.causas.ejecucion, mes: horasDe.get(p.usuario)?.trabajadas ?? null,
+        potencial: horasDe.get(p.usuario)?.potencial ?? null,
+        carga: horasDe.get(p.usuario)?.potencial ? (horasDe.get(p.usuario)!.trabajadas ?? 0) / horasDe.get(p.usuario)!.potencial : null, trab: p.r.trabConPresu, presu: p.r.presuConTrab,
         usadas: p.r.presuConTrab ? p.r.trabConPresu / p.r.presuConTrab : null, excedidos: p.r.excedidos, sin_sgr: p.sinAsignacion ? "Sí" : "No",
       })),
     }) },
@@ -410,15 +414,15 @@ function paginaSeguimientoFase(fz: Fase, items: Analisis[], testing: Analisis[] 
   return regiones;
 }
 
-function paginaTablero(items: Analisis[]): DefRegion[] {
+function paginaTablero(items: Analisis[], horasDe: Map<string, HorasPersona> = new Map()): DefRegion[] {
   return [{ id: "tablero", titulo: "Tablero del equipo", construir: async () => {
     const filas: Record<string, unknown>[] = [];
     for (const fz of ["desa", "test"] as const) {
       for (const p of agruparPorPersona(items.filter((a) => a.fase === fz)).sort((a, b) => a.lider.localeCompare(b.lider) || a.nombre.localeCompare(b.nombre))) {
         const sgr = ordenar(p.items.filter((a) => a.etapa !== "sin_asignacion"));
-        if (!sgr.length) filas.push({ fase: FASE[fz], lider: p.lider, persona: p.nombre, ayer: p.r.horasAyer, sgr: "Sin SGR asignado" });
+        if (!sgr.length) filas.push({ fase: FASE[fz], lider: p.lider, persona: p.nombre, ayer: horasDe.get(p.usuario)?.trabajadas ?? null, sgr: "Sin SGR asignado" });
         for (const a of sgr) filas.push({
-          fase: FASE[fz], lider: a.lider, persona: p.nombre, ayer: p.r.horasAyer, sgr: a.id_req, asunto: a.asunto,
+          fase: FASE[fz], lider: a.lider, persona: p.nombre, ayer: horasDe.get(p.usuario)?.trabajadas ?? null, sgr: a.id_req, asunto: a.asunto,
           situacion: SITUACIONES[a.situacion].nombre, etapa: ETAPAS[a.etapa].nombre, entrega: a.entregaCorregida ?? a.entrega_estimada,
           atraso: a.atraso, causa: a.causaPrincipal ? CAUSAS[a.causaPrincipal].nombre : null, devoluciones: a.devoluciones,
         });
@@ -426,7 +430,7 @@ function paginaTablero(items: Analisis[]): DefRegion[] {
     }
     return una({
       id: "tablero", titulo: "Tablero del equipo",
-      columnas: cols(["fase", "Fase", "texto"], ["lider", "Líder", "texto"], ["persona", "Persona", "texto"], ["ayer", "Horas cargadas ayer (persona)", "horas"],
+      columnas: cols(["fase", "Fase", "texto"], ["lider", "Líder", "texto"], ["persona", "Persona", "texto"], ["ayer", "Horas del mes (persona)", "horas"],
         ["sgr", "SGR", "texto"], ["asunto", "Asunto", "texto"], ["situacion", "Situación", "texto"], ["etapa", "Etapa", "texto"],
         ["entrega", "Entrega corregida", "fecha"], ["atraso", "Atraso (días hábiles)", "entero"], ["causa", "Causa principal", "texto"],
         ["devoluciones", "Devoluciones al desarrollador", "entero"]),
@@ -461,13 +465,14 @@ export async function paginaExcel(ruta: string, sp: SearchParams): Promise<Pagin
   }
   const enCurso: Record<string, { titulo: string; fase?: Fase; regiones: (items: Analisis[]) => DefRegion[] }> = {
     "/en-curso": { titulo: "Requerimientos en curso", regiones: paginaEnCurso },
-    "/en-curso/desarrollo": { titulo: "Desarrollo en curso", fase: "desa", regiones: (i) => paginaSeguimientoFase("desa", i, testingDe(i)) },
-    "/en-curso/testing": { titulo: "Testing en curso", fase: "test", regiones: (i) => paginaSeguimientoFase("test", i) },
-    "/en-curso/equipo": { titulo: "Tablero del equipo", regiones: paginaTablero },
+    "/en-curso/desarrollo": { titulo: "Desarrollo en curso", fase: "desa", regiones: (i) => paginaSeguimientoFase("desa", i, testingDe(i), horasDe) },
+    "/en-curso/testing": { titulo: "Testing en curso", fase: "test", regiones: (i) => paginaSeguimientoFase("test", i, [], horasDe) },
+    "/en-curso/equipo": { titulo: "Tablero del equipo", regiones: (i) => paginaTablero(i, horasDe) },
   };
   const def = enCurso[ruta];
   if (!def) return null;
   const ctx = await contextoSeguimiento(sp);
+  const horasDe = new Map((await cargarHoras(ctx.analisis)).personas.map((p) => [p.usuario, p]));
   // SGR en testing de los desarrolladores elegidos, para atribuirles las devoluciones.
   const testingDe = (desa: Analisis[]) => {
     const liderDe = new Map(ctx.analisis.filter((a) => a.fase === "desa").map((a) => [a.usuario, a.lider]));

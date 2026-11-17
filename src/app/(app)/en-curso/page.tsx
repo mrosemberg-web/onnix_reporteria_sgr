@@ -2,7 +2,10 @@ import { TituloRegion } from "@/components/BotonExcel";
 import { BarrasApiladasH, DispersionAvance } from "@/components/graficos";
 import { EncabezadoSeguimiento, LeyendaCausas, SinSeguimiento, TablaSgr } from "@/components/seguimiento-ui";
 import { Indicador, Lectura } from "@/components/ui";
+import { Buscador } from "@/components/Buscador";
 import { requerirSeccion } from "@/lib/auth";
+import { textoBusqueda } from "@/lib/busqueda";
+import { cargarHoras, filtrarHoras, resumirHoras } from "@/lib/horas";
 import type { SearchParams } from "@/lib/filtros";
 import { dias, fecha, gsCorto, horas, num, pct } from "@/lib/formato";
 import { lecturaSeguimiento } from "@/lib/lectura-seguimiento";
@@ -19,6 +22,7 @@ const FASE = { desa: "Desarrollo", test: "Testing" } as const;
 export default async function EnCurso({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sesion = await requerirSeccion("en_curso");
   const [{ analisis, cargas, corte }, sp] = await Promise.all([cargarSeguimiento(), searchParams]);
+  const hp = await cargarHoras(analisis);
   if (!analisis.length) return <SinSeguimiento esAdmin={sesion.rol === "admin"} />;
   const f = leerFiltrosSeguimiento(sp);
   const op = opcionesSeguimiento(analisis);
@@ -26,6 +30,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
   const sgr = items.filter((a) => a.etapa !== "sin_asignacion");
   const porFase = { desa: sgr.filter((a) => a.fase === "desa"), test: sgr.filter((a) => a.fase === "test") };
   const r = resumir(items);
+  const rh = resumirHoras(filtrarHoras(hp.personas, f));
   const cart = cartera(items);
   const rd = resumir(porFase.desa), rt = resumir(porFase.test);
   const conFecha = sgr.filter((a) => ["atrasado", "vence_pronto", "en_plazo"].includes(a.situacion)).length;
@@ -33,8 +38,6 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
   // Con el SGR iniciado (el plazo corre) y antes de iniciar (esperan información para arrancar).
   const cliente = sgr.filter((a) => a.etapa === "cliente").sort(porEspera);
   const clienteSinIniciar = sgr.filter((a) => a.etapa === "cliente_sin_iniciar").sort(porEspera);
-  const personas = new Set(items.map((a) => a.usuario));
-  const sinHorasAyer = [...personas].filter((p) => items.filter((a) => a.usuario === p).every((a) => a.horas_ayer === 0));
   const masAtrasados = sgr.filter((a) => a.situacion === "atrasado").sort((a, b) => (b.atraso ?? 0) - (a.atraso ?? 0)).slice(0, 12);
   const activos = sgr.filter((a) => a.etapa === "activo" && a.avance != null && a.consumo != null);
   const ejecPorTipo = (fz: "desa" | "test", t: Ejecucion) => porFase[fz].filter((a) => a.etapa !== "finalizado" && a.ejecucion === t);
@@ -53,8 +56,8 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
           nota={[cliente.length ? `ya iniciados; mediana de ${dias(mediana(cliente.filter((a) => a.diasEnEstado != null).map((a) => a.diasEnEstado!)))} en espera` : "ya iniciados",
             clienteSinIniciar.length ? `+${num(clienteSinIniciar.length)} antes de iniciar` : ""].filter(Boolean).join("; ")} />
         <Indicador nombre="Devoluciones de testing" valor={num(r.devoluciones)} nota={`en ${num(r.sgrConDevolucion)} SGR; ${num(r.devueltosAhora)} devueltos hoy`} />
-        <Indicador nombre="Horas cargadas ayer" valor={horas(r.horasAyer)}
-          nota={`${num(personas.size - sinHorasAyer.length)} de ${num(personas.size)} personas`} />
+        <Indicador nombre={`Horas cargadas en ${hp.nombrePeriodo}`} valor={hp.personas.length ? horas(rh.trabajadas) : "–"}
+          nota={hp.personas.length ? `de ${horas(rh.potencial)} potenciales (${pct(rh.carga)}); ${num(rh.debajo)} de ${num(rh.personas)} personas por debajo` : "Cargá la planilla «Resumen de horas»"} />
         <Indicador nombre="Cartera en curso" valor={gsCorto(cart.monto)}
           nota={`${gsCorto(cart.desa)} de desarrollo + ${gsCorto(cart.test)} de testing; sin el testing de los SGR que siguen en desarrollo`} />
       </section>
@@ -140,12 +143,13 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
             <TituloRegion region="esperando_cliente">Esperando al cliente</TituloRegion>
             <p>Para gestionar con el cliente. Primero los SGR ya iniciados (el plazo corre), después los que esperan para empezar; en cada grupo, del que más espera al más reciente.</p>
           </div>
+          <Buscador>
           <div className="tabla-env">
             <table>
               <thead><tr><th>SGR</th><th>Asunto</th><th>Situación</th><th>Fase</th><th>Responsable</th><th>Estado</th><th>Desde</th><th className="n">Días hábiles esperando</th><th className="n">Atraso</th></tr></thead>
               <tbody>
                 {[...cliente, ...clienteSinIniciar].map((a) => (
-                  <tr key={`${a.fase}-${a.id_req}`}>
+                  <tr key={`${a.fase}-${a.id_req}`} data-busqueda={textoBusqueda(a.id_req, a.asunto, a.nombre, a.usuario, a.lider, a.estado, a.tipo_servicio, a.equipo)}>
                     <td>{a.id_req}</td>
                     <td className="recorte" title={a.asunto ?? ""}>{a.asunto}</td>
                     <td className="nombre">{a.iniciado ? <span className="etiqueta e-leve">Iniciado</span> : <span className="etiqueta e-neutro">Antes de iniciar</span>}</td>
@@ -160,6 +164,7 @@ export default async function EnCurso({ searchParams }: { searchParams: Promise<
               </tbody>
             </table>
           </div>
+          </Buscador>
         </section>
       )}
     </>

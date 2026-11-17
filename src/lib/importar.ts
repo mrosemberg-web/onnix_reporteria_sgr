@@ -2,7 +2,7 @@ import "server-only";
 import { transaccion } from "./db";
 import { COLUMNAS_DB, decodificar, leerPlanilla } from "./planilla";
 import {
-  COLUMNAS_SEGUIMIENTO, detectarTipo, leerSeguimiento, matrizCsv, NOMBRE_TIPO, type TipoPlanilla,
+  COLUMNAS_HORAS, COLUMNAS_SEGUIMIENTO, detectarTipo, leerResumenHoras, leerSeguimiento, matrizCsv, NOMBRE_TIPO, type TipoPlanilla,
 } from "./planilla-seguimiento";
 
 export type ResultadoImportacion =
@@ -22,7 +22,7 @@ export async function importarArchivo(
   const tipo = detectarTipo(matrizCsv(txt.split(/\r?\n/, 1)[0] ?? "")[0] ?? []);
   if (!tipo) {
     return { ok: false, archivo: nombre, tipo: null, advertencias: [],
-      errores: ["No se reconoce la planilla. Se esperan los encabezados de «Facturación por período», «Seguimiento desarrollo» o «Seguimiento testing»."] };
+      errores: ["No se reconoce la planilla. Se esperan los encabezados de «Facturación por período», «Seguimiento desarrollo», «Seguimiento testing» o «Resumen de horas»."] };
   }
 
   if (tipo === "facturacion") {
@@ -39,6 +39,22 @@ export async function importarArchivo(
       for (let i = 0; i < conCarga.length; i += 500) {
         await tx`insert into requerimientos ${tx(conCarga.slice(i, i + 500), [...COLUMNAS_DB, "carga_id"])}`;
       }
+      return carga.id;
+    });
+    return { ok: true, archivo: nombre, tipo, filas: filas.length, advertencias, cargaId };
+  }
+
+  if (tipo === "resumen_horas") {
+    const { filas, advertencias, errores } = leerResumenHoras(txt);
+    if (errores.length) return { ok: false, archivo: nombre, tipo, errores, advertencias };
+    if (!filas.length) return { ok: false, archivo: nombre, tipo, errores: ["La planilla de horas no tiene filas."], advertencias };
+    const cargaId = await transaccion(async (tx) => {
+      const [carga] = await tx<{ id: number }[]>`
+        insert into cargas (archivo, filas, advertencias, cargado_por, tipo, fecha_corte)
+        values (${nombre}, ${filas.length}, ${tx.json(advertencias.slice(0, 500))}, ${usuarioId}, ${tipo}, ${fechaCorte})
+        returning id`;
+      await tx`delete from horas_periodo`;
+      await tx`insert into horas_periodo ${tx(filas.map((f) => ({ ...f, carga_id: carga.id })), [...COLUMNAS_HORAS, "carga_id"])}`;
       return carga.id;
     });
     return { ok: true, archivo: nombre, tipo, filas: filas.length, advertencias, cargaId };

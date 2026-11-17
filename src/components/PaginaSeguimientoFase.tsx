@@ -3,6 +3,7 @@ import { BarrasApiladasH } from "./graficos";
 import { EncabezadoSeguimiento, LeyendaCausas, SinSeguimiento, TablaSgr } from "./seguimiento-ui";
 import { Indicador, Lectura } from "./ui";
 import { requerirSeccion } from "@/lib/auth";
+import { cargarHoras, filtrarHoras, resumirHoras } from "@/lib/horas";
 import type { SearchParams } from "@/lib/filtros";
 import { dias, horas, num, pct } from "@/lib/formato";
 import { lecturaSeguimiento } from "@/lib/lectura-seguimiento";
@@ -24,6 +25,7 @@ const ORDEN_SITUACION = { atrasado: 0, vence_pronto: 1, en_plazo: 2, fin_tarde: 
 export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" | "test"; searchParams: Promise<SearchParams> }) {
   const sesion = await requerirSeccion("en_curso");
   const [{ analisis, cargas, corte }, sp] = await Promise.all([cargarSeguimiento(), searchParams]);
+  const hp = await cargarHoras(analisis);
   const deFase = analisis.filter((a) => a.fase === fz);
   if (!deFase.length) return <SinSeguimiento esAdmin={sesion.rol === "admin"} />;
   const t = TEXTO[fz];
@@ -34,6 +36,8 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
   const r = resumir(items);
 
   const personas = agruparPorPersona(items);
+  const horasDe = new Map(hp.personas.map((p) => [p.usuario, p]));
+  const rh = resumirHoras(filtrarHoras(hp.personas, { ...f, fases: [] }, fz));
 
   // Devoluciones de testing atribuidas a cada desarrollador (columna Desarrollador del CSV de testing).
   const hayDesarrollador = analisis.some((a) => a.fase === "test" && a.desarrollador);
@@ -65,7 +69,8 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
           : <Indicador nombre="Excedidos en horas" valor={num(r.excedidos)} nota={`${horas(r.horasExcedidas)} por encima del presupuesto`} />}
         <Indicador nombre="Horas usadas" valor={pct(r.presuConTrab ? r.trabConPresu / r.presuConTrab : null)}
           nota={`${horas(r.trabConPresu)} de ${horas(r.presuConTrab)} presupuestadas${r.horasAntesDeIniciar ? `; ${horas(r.horasAntesDeIniciar)} antes de iniciar, aparte` : ""}`} />
-        <Indicador nombre="Horas cargadas ayer" valor={horas(r.horasAyer)} nota={`${num(personas.filter((p) => p.r.horasAyer > 0).length)} de ${num(personas.length)} personas`} />
+        <Indicador nombre={`Horas cargadas en ${hp.nombrePeriodo}`} valor={hp.personas.length ? horas(rh.trabajadas) : "–"}
+          nota={hp.personas.length ? `de ${horas(rh.potencial)} potenciales (${pct(rh.carga)}); ${num(rh.debajo)} de ${num(rh.personas)} personas por debajo` : "Cargá la planilla «Resumen de horas»"} />
       </section>
 
       <Lectura parrafos={lecturaSeguimiento(items)} fase={fz} />
@@ -95,7 +100,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
                 {fz === "desa" && mostrarDev && <th className="n">Devoluciones recibidas</th>}
                 <th className="n">Atrasados</th><th className="n">Atraso externo</th>
                 {mostrarDev && <th className="n">{fz === "test" ? "Esperando corrección del desarrollador" : "Atraso por devoluciones"}</th>}
-                <th className="n">Pausa sin motivo</th><th className="n">Atraso por ejecución</th><th className="n">Horas ayer</th><th className="n">Horas usadas</th><th className="n">Excedidos</th>
+                <th className="n">Pausa sin motivo</th><th className="n">Atraso por ejecución</th><th className="n" title="Horas trabajadas en el período, según la planilla «Resumen de horas»">Horas del mes</th><th className="n" title="Horas trabajadas sobre potencial (días hábiles × horas por día)">Carga</th><th className="n">Horas usadas</th><th className="n">Excedidos</th>
               </tr>
             </thead>
             <tbody>
@@ -114,7 +119,10 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
                   {mostrarDev && <td className="n">{dias(p.r.causas.devoluciones + (fz === "desa" ? devDe.get(p.usuario)?.atraso ?? 0 : 0))}</td>}
                   <td className="n">{dias(p.r.causas.pausa)}</td>
                   <td className="n" style={{ color: p.r.causas.ejecucion > 0 ? "var(--mal)" : undefined }}>{dias(p.r.causas.ejecucion)}</td>
-                  <td className="n">{horas(p.r.horasAyer)}</td>
+                  <td className="n" title={horasDe.get(p.usuario) ? `${horas(horasDe.get(p.usuario)!.trabajadas ?? 0)} de ${horas(horasDe.get(p.usuario)!.potencial)} potenciales` : "Sin datos en la planilla de horas"}>
+                    {horasDe.get(p.usuario) ? (horasDe.get(p.usuario)!.trabajadas == null ? <span className="debil">sin carga</span> : horas(horasDe.get(p.usuario)!.trabajadas)) : "–"}</td>
+                  <td className="n" style={{ color: horasDe.get(p.usuario) && horasDe.get(p.usuario)!.diferencia > 0 ? "var(--mal)" : undefined }}>
+                    {horasDe.get(p.usuario)?.potencial ? pct((horasDe.get(p.usuario)!.trabajadas ?? 0) / horasDe.get(p.usuario)!.potencial) : "–"}</td>
                   <td className="n">{p.r.presuConTrab ? pct(p.r.trabConPresu / p.r.presuConTrab) : "–"}</td>
                   <td className="n">{p.r.excedidos || ""}</td>
                 </tr>
@@ -130,7 +138,7 @@ export async function PaginaSeguimientoFase({ fz, searchParams }: { fz: "desa" |
           {fz === "test" && <><strong>Esperando corrección del desarrollador</strong>: días de atraso de SGR devueltos al desarrollador; no es demora del tester.{" "}</>}
           <strong>Pausa sin motivo</strong>: días en pausa sin indicar si se espera al cliente. <strong>Atraso por ejecución</strong>: atraso que no explican
           las causas anteriores. <strong>Sin iniciar</strong>: SGR sin fecha de inicio (análisis, presupuesto, en cola o esperando al cliente para arrancar); no tienen plazo corriendo. <strong>Horas usadas</strong>: horas trabajadas sobre presupuestadas, en SGR iniciados con presupuesto y horas cargadas; las horas cargadas antes de iniciar quedan aparte.
-          <strong> Excedidos</strong>: SGR con más horas trabajadas que presupuestadas.
+          <strong> Excedidos</strong>: SGR con más horas trabajadas que presupuestadas. <strong>Horas del mes</strong> y <strong>Carga</strong>: horas trabajadas en el período según la planilla «Resumen de horas», y su porcentaje sobre las horas potenciales (días hábiles × horas por día); en rojo, por debajo del potencial.
           {fz === "desa" && !hayDesarrollador && <> Para atribuir las devoluciones de testing a cada desarrollador, la planilla de testing debe incluir la columna «Desarrollador».</>}
         </p>
       </section>

@@ -1,5 +1,7 @@
 import { BotonExcel, TituloRegion } from "@/components/BotonExcel";
+import { Buscador } from "@/components/Buscador";
 import { BarrasH } from "@/components/graficos";
+import { textoBusqueda } from "@/lib/busqueda";
 import { Encabezado, EtiquetaIndice, Indicador, Lectura, SinDatos } from "@/components/ui";
 import { contextoReporte } from "@/lib/contexto";
 import { textoAnios, type SearchParams } from "@/lib/filtros";
@@ -144,6 +146,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
           <TituloRegion region="mas_pausados">SGR con más tiempo en pausa</TituloRegion>
           <p>Los que más corren la fecha de entrega sin consumir horas de trabajo.</p>
         </div>
+        <Buscador>
         <div className="tabla-env">
           <table>
             <thead>
@@ -152,7 +155,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
             </thead>
             <tbody>
               {masPausados.map((r) => (
-                <tr key={r.id_req}>
+                <tr key={r.id_req} data-busqueda={textoBusqueda(r.id_req, r.asunto, r.asignado_a, r.asignado_testing, r.departamento, r.tipo_requerimiento, r.equipo)}>
                   <td>{r.id_req}</td>
                   <td className="recorte" title={r.asunto ?? ""}>{r.asunto}</td>
                   <td>{r.asignado_a ?? "–"}</td>
@@ -166,6 +169,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
             </tbody>
           </table>
         </div>
+        </Buscador>
       </section>
     </>
   );

@@ -1,7 +1,9 @@
 import { BotonExcel } from "./BotonExcel";
 import { BotonPdf } from "./BotonPdf";
 import { FiltrosLista } from "./FiltrosLista";
+import { Buscador } from "./Buscador";
 import { LineaTiempo } from "./graficos";
+import { textoBusqueda } from "@/lib/busqueda";
 import { fecha, fechaHora, horas, num, pct } from "@/lib/formato";
 import type { CargaSeguimiento, FiltrosSeguimiento } from "@/lib/seguimiento";
 import {
@@ -106,6 +108,7 @@ export function SinSeguimiento({ esAdmin }: { esAdmin: boolean }) {
 export function TablaSgr({ items, corte, conPersona = true }: { items: Analisis[]; corte: { desa: string; test: string }; conPersona?: boolean }) {
   const conDev = items.some((a) => a.fase === "test" && a.devNombre);
   return (
+    <Buscador>
     <div className="tabla-env">
       <table>
         <thead>
@@ -117,7 +120,8 @@ export function TablaSgr({ items, corte, conPersona = true }: { items: Analisis[
         </thead>
         <tbody>
           {items.map((a) => (
-            <tr key={`${a.fase}-${a.id_req}-${a.usuario}`}>
+            <tr key={`${a.fase}-${a.id_req}-${a.usuario}`}
+              data-busqueda={textoBusqueda(a.id_req, a.asunto, a.nombre, a.usuario, a.lider, a.devNombre, a.tipo_servicio, a.equipo, a.estado)}>
               <td>{a.id_req}{a.fase === "test" && (a.devoluciones ?? 0) > 0 && <span className="debil" title="Devoluciones al desarrollador"> ({a.devoluciones} dev.)</span>}</td>
               <td className="recorte" title={a.asunto ?? ""}>{a.asunto}</td>
               {conPersona && <td>{a.nombre ?? a.usuario}</td>}
@@ -137,5 +141,6 @@ export function TablaSgr({ items, corte, conPersona = true }: { items: Analisis[
         </tbody>
       </table>
     </div>
+    </Buscador>
   );
 }

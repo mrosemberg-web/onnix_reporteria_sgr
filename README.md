@@ -163,6 +163,20 @@ Se alimenta con dos planillas más, que se suben en **Cargar planillas** junto c
 
 El tipo de cada archivo se reconoce por sus encabezados y cada planilla reemplaza solo sus propios datos. Al cargar se indica la **fecha de corte**, que es el «hoy» con el que se calculan los atrasos.
 
+### Horas trabajadas del período
+
+La planilla **«Resumen de horas»** (una fila por persona: Id Usuario, Equipo, Team Leader, Periodo, Horas Trabajadas, Días Hábiles, Potencial Horas, Diferencia) se sube en **Cargar planillas**, donde se reconoce sola y reemplaza la carga anterior. En el apartado En curso reemplaza a las «horas cargadas ayer» de las planillas de seguimiento:
+
+- **Indicador «Horas cargadas en {mes}»** en Resumen en curso, Desarrollo en curso y Testing en curso: horas trabajadas del período contra las potenciales, con el porcentaje de carga y cuántas personas quedan por debajo. Respeta los filtros de fase, líder y persona.
+- **Tablas por persona**: columnas «Horas del mes» y «Carga» (en rojo, si queda por debajo del potencial).
+- **Tablero del equipo**: cada tarjeta muestra las horas del mes contra el potencial.
+- **Asignación al equipo**: cada persona se ubica en desarrollo o testing según la planilla de seguimiento en la que figura; si no figura en ninguna, por el código de equipo («QA…» es testing).
+- **Horas vacías**: se muestran como «sin carga» y cuentan como 0 contra el potencial.
+
+### Búsqueda en las listas
+
+Todas las listas de SGR tienen un buscador por SGR, asunto, persona y área, igual que el detalle de Requerimientos. Están en Tiempos y devoluciones, Proyección de entregas, Resumen en curso (los más atrasados y esperando al cliente), Desarrollo y Testing en curso (detalle de SGR) y Tablero del equipo, donde se ocultan las tarjetas y los equipos sin coincidencias. La búsqueda acepta varias palabras, sin importar mayúsculas ni tildes. Filtra lo que se ve en pantalla, así que el PDF sale con el filtro aplicado; el Excel sigue incluyendo todas las filas.
+
 ### Cómo se mide el atraso
 
 Se mide en **días hábiles** posteriores a la **entrega estimada original** y la fecha de corte (o la fecha en que la fase se dio por finalizada), y se reparte en causas en este orden:

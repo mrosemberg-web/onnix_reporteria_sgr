@@ -10,10 +10,11 @@ export const metadata = { title: "Cargar planillas" };
 export default async function Carga() {
   await requerirAdmin();
   const [[conteo], historial] = await Promise.all([
-    sql<{ facturacion: number; seguimiento_desa: number; seguimiento_test: number }[]>`
+    sql<{ facturacion: number; seguimiento_desa: number; seguimiento_test: number; resumen_horas: number }[]>`
       select (select count(*) from requerimientos) as facturacion,
              (select count(*) from seguimiento where fase = 'desa') as seguimiento_desa,
-             (select count(*) from seguimiento where fase = 'test') as seguimiento_test`,
+             (select count(*) from seguimiento where fase = 'test') as seguimiento_test,
+             (select count(*) from horas_periodo) as resumen_horas`,
     sql<{ id: number; tipo: TipoPlanilla; archivo: string; filas: number; cargado_en: Date; fecha_corte: string | null; nombre: string | null; adv: number; vigente: boolean }[]>`
       select c.id, c.tipo, c.archivo, c.filas, c.cargado_en, c.fecha_corte, u.nombre, jsonb_array_length(c.advertencias) as adv,
              c.id = max(c.id) over (partition by c.tipo) as vigente
@@ -26,8 +27,8 @@ export default async function Carga() {
         <div>
           <h1>Cargar planillas</h1>
           <p>
-            Hay tres planillas: la de facturación por período (requerimientos implementados) y las dos de seguimiento de requerimientos
-            en curso, desde la mirada de desarrollo y de testing. Cada una reemplaza solo los datos de su tipo y la carga es atómica:
+            Hay cuatro planillas: la de facturación por período (requerimientos implementados), las dos de seguimiento de requerimientos
+            en curso (desde la mirada de desarrollo y de testing) y el resumen de horas trabajadas en el período por persona. Cada una reemplaza solo los datos de su tipo y la carga es atómica:
             si algo falla, quedan los datos anteriores.
           </p>
         </div>

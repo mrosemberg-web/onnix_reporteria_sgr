@@ -345,3 +345,9 @@ td.nombre { white-space: nowrap; }
 
 .tabla-conciliacion tr.subtotal td { font-weight: 650; border-top: 2px solid var(--linea); }
 .tabla-conciliacion tr.grupo td { font-weight: 650; background: var(--superficie-2); }
+
+/* Buscador de listas --------------------------------------------------- */
+.buscador { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.buscador input[type="search"] { min-width: 280px; }
+.buscador .debil { font-size: 0.85rem; padding-bottom: 8px; }
+[hidden] { display: none !important; }

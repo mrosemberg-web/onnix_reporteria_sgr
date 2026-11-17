@@ -35,6 +35,8 @@ export type ItemProyeccion = {
   asunto: string | null;
   escenario: Escenario;
   origen: "en_curso" | "implementado";
+  /** Área: departamento (implementados) o equipo (en curso), para buscar. */
+  area: string | null;
   /** Planilla de la que sale (null: implementado, planilla de facturación). */
   fase: "desa" | "test" | null;
   situacion: string;            // fase y estado actual, en texto
@@ -80,7 +82,7 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
   if (desa + test === 0) return null;
   const base = esc === 2 ? "fin_desarrollo" : "fin_testing";
   const comun = {
-    id_req: a.id_req, asunto: a.asunto, escenario: esc, origen: "en_curso" as const, fase: a.fase as "desa" | "test" | null,
+    id_req: a.id_req, asunto: a.asunto, escenario: esc, origen: "en_curso" as const, fase: a.fase as "desa" | "test" | null, area: a.equipo,
     situacion: `${a.fase === "desa" ? "Desarrollo" : "Testing"}: ${a.estado ?? ""}`, responsable: a.nombre ?? a.usuario,
     usuarios: [a.usuario], lider: a.lider, tipo: a.tipo_servicio, base: base as ItemProyeccion["base"], desa, test,
     desestimado: false, descuento: null, corrido: false,
@@ -118,7 +120,7 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
 type FilaHistorica = {
   id_req: string; asunto: string | null; servicio: string; estado: string | null; asignado_a: string | null;
   asignado_testing: string | null; tipo_requerimiento: string | null; desa: number; test: number; fecha_fin: string;
-  desestimado: boolean; descuento: number;
+  desestimado: boolean; descuento: number; departamento: string | null;
 };
 
 export type Proyeccion = Awaited<ReturnType<typeof proyeccion>>;
@@ -156,7 +158,7 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
 
   // Implementados cuya fecha que manda cayó en el mes actual (hasta la fecha de corte).
   const historicos = await sql<FilaHistorica[]>`
-    select id_req, asunto, servicio, estado, asignado_a, asignado_testing, tipo_requerimiento,
+    select id_req, asunto, servicio, estado, asignado_a, asignado_testing, tipo_requerimiento, departamento,
            (case when aplica_desa then importe_desa else 0 end)::float8 as desa,
            (case when aplica_test then importe_test else 0 end)::float8 as test,
            coalesce(case when servicio = 'solo_desa' then fecha_fin_desa else fecha_fin_testing end, implementacion) as fecha_fin,
@@ -174,7 +176,7 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
       const esc: Escenario = h.servicio === "desa_test" ? 1 : h.servicio === "solo_desa" ? 2 : 3;
       const usuarios = [h.asignado_a, h.asignado_testing].filter((x): x is string => !!x);
       return {
-        id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const, fase: null,
+        id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const, fase: null, area: h.departamento,
         situacion: h.desestimado ? "Desestimado por el cliente (cuenta como entregado)" : "Implementado",
         desestimado: h.desestimado, descuento: h.desestimado && h.descuento > 0 ? h.descuento : null, corrido: false,
         responsable: usuarios.join(" / "), usuarios, lider: usuarios.map((u) => lideres.get(u)).find(Boolean) ?? null,

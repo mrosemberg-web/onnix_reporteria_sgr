@@ -2,12 +2,13 @@
 // Seguimiento_desa.csv (mirada de desarrollo) y Seguimiento_testing.csv (mirada de testing).
 import { normalizarEncabezado, parsearCsv, parsearFecha, parsearNumero } from "./planilla";
 
-export type TipoPlanilla = "facturacion" | "seguimiento_desa" | "seguimiento_test";
+export type TipoPlanilla = "facturacion" | "seguimiento_desa" | "seguimiento_test" | "resumen_horas";
 
 export const NOMBRE_TIPO: Record<TipoPlanilla, string> = {
   facturacion: "Facturación por período",
   seguimiento_desa: "Seguimiento de desarrollo (en curso)",
   seguimiento_test: "Seguimiento de testing (en curso)",
+  resumen_horas: "Resumen de horas",
 };
 
 export function matrizCsv(txt: string): string[][] {
@@ -22,6 +23,7 @@ export function detectarTipo(encabezados: string[]): TipoPlanilla | null {
   if (h.has("id req") && h.has("total a facturar")) return "facturacion";
   if (h.has("nro sgr") && h.has("horas trab desa total")) return "seguimiento_desa";
   if (h.has("nro sgr") && h.has("horas trab test")) return "seguimiento_test";
+  if (h.has("id usuario") && h.has("horas trabajadas") && h.has("potencial horas")) return "resumen_horas";
   return null;
 }
 
@@ -140,5 +142,64 @@ export function leerSeguimiento(txt: string, fase: "desa" | "test") {
     }
     filas.push(f);
   }
+  return { filas, advertencias, errores };
+}
+
+// ---------------------------------------------------------------------------
+// Planilla «Resumen de horas»: una fila por persona con sus horas del período.
+// ---------------------------------------------------------------------------
+export type FilaHoras = {
+  usuario: string;
+  equipo: string | null;
+  team_leader: string | null;
+  periodo: string | null;
+  horas_trabajadas: number | null;
+  dias_habiles: number | null;
+  potencial: number | null;
+  diferencia: number | null;
+};
+export const COLUMNAS_HORAS: (keyof FilaHoras)[] = ["usuario", "equipo", "team_leader", "periodo", "horas_trabajadas", "dias_habiles", "potencial", "diferencia"];
+
+export function leerResumenHoras(txt: string) {
+  const advertencias: string[] = [];
+  const errores: string[] = [];
+  const matriz = matrizCsv(txt);
+  if (matriz.length < 2) return { filas: [] as FilaHoras[], advertencias, errores: ["El archivo no tiene filas de datos."] };
+  const enc = matriz[0].map(normalizarEncabezado);
+  const col = (n: string) => enc.indexOf(n);
+  const idx = { usuario: col("id usuario"), equipo: col("equipo"), team_leader: col("team leader"), periodo: col("periodo"),
+    horas_trabajadas: col("horas trabajadas"), dias_habiles: col("dias habiles"), potencial: col("potencial horas"), diferencia: col("diferencia") };
+  for (const [k, n] of [["usuario", "Id Usuario"], ["horas_trabajadas", "Horas Trabajadas"], ["potencial", "Potencial Horas"]] as const) {
+    if (idx[k] < 0) errores.push(`Falta la columna "${n}".`);
+  }
+  if (errores.length) return { filas: [], advertencias, errores };
+  const texto = (c: string[], i: number) => (i < 0 ? null : (c[i] ?? "").trim() || null);
+  const numero = (c: string[], i: number, linea: number, nombre: string) => {
+    const v = texto(c, i);
+    if (v == null) return null;
+    const n = parsearNumero(v);
+    if (n == null) advertencias.push(`Línea ${linea}: "${v}" no es un número válido en "${nombre}"; se dejó vacío.`);
+    return n;
+  };
+  const filas: FilaHoras[] = [];
+  const vistos = new Set<string>();
+  for (let n = 1; n < matriz.length; n++) {
+    const c = matriz[n], linea = n + 1;
+    const usuario = texto(c, idx.usuario);
+    if (!usuario) { advertencias.push(`Línea ${linea}: sin «Id Usuario»; se omitió.`); continue; }
+    if (vistos.has(usuario.toLowerCase())) advertencias.push(`Línea ${linea}: ${usuario} está repetido; se suman sus filas.`);
+    vistos.add(usuario.toLowerCase());
+    const periodo = texto(c, idx.periodo);
+    if (periodo && !/^\d{4}\/\d{1,2}$/.test(periodo)) advertencias.push(`Línea ${linea}: período "${periodo}" con formato inesperado (se espera AAAA/MM).`);
+    filas.push({
+      usuario, equipo: texto(c, idx.equipo), team_leader: texto(c, idx.team_leader), periodo,
+      horas_trabajadas: numero(c, idx.horas_trabajadas, linea, "Horas Trabajadas"),
+      dias_habiles: numero(c, idx.dias_habiles, linea, "Dias Habiles"),
+      potencial: numero(c, idx.potencial, linea, "Potencial Horas"),
+      diferencia: numero(c, idx.diferencia, linea, "Diferencia"),
+    });
+  }
+  const periodos = [...new Set(filas.map((f) => f.periodo).filter(Boolean))];
+  if (periodos.length > 1) advertencias.push(`La planilla mezcla períodos (${periodos.join(", ")}); se toman todas las filas.`);
   return { filas, advertencias, errores };
 }

@@ -231,8 +231,10 @@ export async function tiempos(f: Filtros, { completo = false } = {}) {
              coalesce(sum(horas_presu_total) filter (where horas_real_total > 0), 0)::float8 as presu_reg
       from v_requerimientos where ${filtro(f)} and entregado group by 1 order by 1`,
     sql<{ id_req: string; asunto: string | null; devoluciones: number; horas_pausadas: number; lead_hab: number | null;
-          lead_neto: number | null; asignado_a: string | null; asignado_testing: string | null }[]>`
-      select id_req, asunto, devoluciones, horas_pausadas::float8, lead_hab, lead_neto::float8, asignado_a, asignado_testing
+          lead_neto: number | null; asignado_a: string | null; asignado_testing: string | null;
+          departamento: string | null; tipo_requerimiento: string | null; equipo: string | null }[]>`
+      select id_req, asunto, devoluciones, horas_pausadas::float8, lead_hab, lead_neto::float8, asignado_a, asignado_testing,
+             departamento, tipo_requerimiento, equipo
       from v_requerimientos where ${filtro(f)} and horas_pausadas > 0
       order by horas_pausadas desc ${completo ? sql`` : sql`limit 12`}`,
     sql<{ dev_sin_pausa: number; pausa_sin_dev: number; horas_pausa_con_dev: number; horas_pausa_total: number }[]>`

@@ -1,5 +1,7 @@
 import { TituloRegion } from "@/components/BotonExcel";
+import { Buscador } from "@/components/Buscador";
 import { FechaCorteMes } from "@/components/FechaCorteMes";
+import { textoBusqueda } from "@/lib/busqueda";
 import { BarrasAcumulado } from "@/components/graficos";
 import { EncabezadoSeguimiento, SinSeguimiento } from "@/components/seguimiento-ui";
 import { Indicador, Lectura } from "@/components/ui";
@@ -206,6 +208,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
           <TituloRegion region="detalle">Detalle por SGR</TituloRegion>
           <p>De dónde sale cada monto: el mes asignado, la fecha que manda y si fue estimada.</p>
         </div>
+        <Buscador>
         <div className="tabla-env">
           <table>
             <thead>
@@ -214,7 +217,8 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
             </thead>
             <tbody>
               {ordenados.map((i) => (
-                <tr key={`${i.origen}-${i.fase ?? "impl"}-${i.id_req}`}>
+                <tr key={`${i.origen}-${i.fase ?? "impl"}-${i.id_req}`}
+                  data-busqueda={textoBusqueda(i.id_req, i.asunto, i.responsable, ...i.usuarios, i.lider, i.tipo, i.area, i.situacion, ESCENARIOS[i.escenario])}>
                   <td className="nombre"><DestinoChip i={i} actual={actual} /></td>
                   <td className="nombre">{i.id_req}{i.desestimado && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }}>Desestimado</span>}</td>
                   <td className="recorte" title={i.asunto ?? ""}>{i.asunto}</td>
@@ -237,6 +241,7 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
             </tbody>
           </table>
         </div>
+        </Buscador>
       </section>
     </>
   );

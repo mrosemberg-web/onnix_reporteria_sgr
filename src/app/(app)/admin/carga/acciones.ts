@@ -11,7 +11,7 @@ export async function cargarPlanillas(_: EstadoCarga, fd: FormData): Promise<Est
   const s = await requerirAdmin();
   const archivos = fd.getAll("archivos").filter((a): a is File => a instanceof File && a.size > 0);
   if (!archivos.length) return { estado: "listo", resultados: [], error: "Elegí al menos un archivo CSV." };
-  if (archivos.length > 3) return { estado: "listo", resultados: [], error: "Podés subir hasta 3 archivos a la vez (uno de cada tipo)." };
+  if (archivos.length > 4) return { estado: "listo", resultados: [], error: "Podés subir hasta 4 archivos a la vez (uno de cada tipo)." };
   if (fd.get("confirmo") !== "si") return { estado: "listo", resultados: [], error: "Confirmá que querés reemplazar los datos actuales." };
   const fechaCorte = String(fd.get("fecha_corte") ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCorte)) return { estado: "listo", resultados: [], error: "Indicá la fecha de corte." };

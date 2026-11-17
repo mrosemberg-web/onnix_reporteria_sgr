@@ -10,8 +10,9 @@ const REEMPLAZA: Record<TipoPlanilla, (n: Record<TipoPlanilla, number>) => strin
   facturacion: (n) => `reemplaza los ${n.facturacion} SGR históricos`,
   seguimiento_desa: (n) => `reemplaza los ${n.seguimiento_desa} registros en curso de desarrollo`,
   seguimiento_test: (n) => `reemplaza los ${n.seguimiento_test} registros en curso de testing`,
+  resumen_horas: (n) => `reemplaza las horas del período de ${n.resumen_horas} personas`,
 };
-const DESTINO: Record<TipoPlanilla, string> = { facturacion: "/", seguimiento_desa: "/en-curso", seguimiento_test: "/en-curso" };
+const DESTINO: Record<TipoPlanilla, string> = { facturacion: "/", seguimiento_desa: "/en-curso", seguimiento_test: "/en-curso", resumen_horas: "/en-curso" };
 
 async function tipoDe(f: File): Promise<TipoPlanilla | null> {
   const bytes = new Uint8Array(await f.slice(0, 4096).arrayBuffer());
@@ -29,7 +30,7 @@ export function FormCarga({ actuales, hoy }: { actuales: Record<TipoPlanilla, nu
   useEffect(() => { if (estado.estado !== "inicial") setElegidos([]); }, [estado]);
 
   async function elegir(lista: FileList | null) {
-    const files = Array.from(lista ?? []).slice(0, 3);
+    const files = Array.from(lista ?? []).slice(0, 4);
     setElegidos(await Promise.all(files.map(async (archivo) => ({ archivo, tipo: await tipoDe(archivo) }))));
   }
 
@@ -38,7 +39,7 @@ export function FormCarga({ actuales, hoy }: { actuales: Record<TipoPlanilla, nu
     setArrastrando(false);
     if (!e.dataTransfer.files?.length || !input.current) return;
     const dt = new DataTransfer();
-    Array.from(e.dataTransfer.files).slice(0, 3).forEach((f) => dt.items.add(f));
+    Array.from(e.dataTransfer.files).slice(0, 4).forEach((f) => dt.items.add(f));
     input.current.files = dt.files;
     elegir(dt.files);
   }
@@ -50,9 +51,9 @@ export function FormCarga({ actuales, hoy }: { actuales: Record<TipoPlanilla, nu
     <form action={accion} className="form" style={{ maxWidth: 720 }}>
       <div className={`zona-archivo ${arrastrando ? "activa" : ""}`}
         onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }} onDragLeave={() => setArrastrando(false)} onDrop={soltar}>
-        <strong>Arrastrá hasta 3 planillas acá o elegilas</strong>
+        <strong>Arrastrá hasta 4 planillas acá o elegilas</strong>
         <span className="debil" style={{ fontSize: "0.85rem" }}>
-          CSV separado por punto y coma. El tipo se reconoce solo: Facturación por período, Seguimiento de desarrollo y Seguimiento de testing.
+          CSV separado por punto y coma. El tipo se reconoce solo: Facturación por período, Seguimiento de desarrollo, Seguimiento de testing y Resumen de horas.
         </span>
         <input ref={input} type="file" name="archivos" accept=".csv,text/csv" multiple required onChange={(e) => elegir(e.target.files)} />
       </div>
