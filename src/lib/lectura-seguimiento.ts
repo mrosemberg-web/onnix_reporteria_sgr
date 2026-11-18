@@ -8,8 +8,8 @@ export function lecturaSeguimiento(items: Analisis[]): string[] {
   const sgr = items.filter(enCurso);
   if (!sgr.length) return ["No hay SGR en curso para los filtros elegidos."];
   const r = resumir(items);
-  if (r.pausasSinRegistrar) {
-    out.push(`Revisar datos: ${num(r.pausasSinRegistrar)} SGR detenidos tienen menos horas pausadas que los días hábiles que llevan en ese estado. Ese tiempo sin registrar se cuenta como ejecución, así que el atraso por ejecución puede estar sobrestimado.`);
+  if (r.pausasEnCurso) {
+    out.push(`${num(r.pausasEnCurso)} SGR están detenidos ahora (esperando al cliente, devueltos o en pausa), con ${num(r.diasPausaEnCurso)} días hábiles de pausa en curso desde que se detuvieron hasta el corte de la planilla. Ese tiempo se cuenta como pausa aunque todavía no esté registrado, y sus entregas corregidas se seguirán corriendo hasta que se retomen.`);
   }
   const desa = sgr.filter((a) => a.fase === "desa").length;
   const test = sgr.length - desa;

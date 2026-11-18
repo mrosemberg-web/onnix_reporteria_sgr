@@ -80,7 +80,7 @@ function Tarjeta({ items, corte, horasMes, periodo }: { items: Analisis[]; corte
                 {a.entrega_estimada && <LineaTiempo inicio={a.fecha_inicio} estimada={a.entrega_estimada} nueva={a.entregaCorregida} corte={corte}
                   fin={a.etapa === "finalizado" ? a.fecha_estado : null} />}
                 <span className="debil">
-                  {a.entrega_estimada ? `Entrega ${fecha(a.entregaCorregida ?? a.entrega_estimada)}` : "Sin fecha"}
+                  {a.entrega_estimada ? `Entrega ${fecha(a.entregaCorregida ?? a.entrega_estimada)}${a.fechaAbierta ? " o después (en pausa)" : ""}` : "Sin fecha"}
                   {a.situacion === "atrasado" && a.causaPrincipal && <>; {CAUSAS[a.causaPrincipal].nombre.toLowerCase()}</>}
                   {a.fase === "test" && (a.devoluciones ?? 0) > 0 && <>; {a.devoluciones} devoluciones</>}
                 </span>

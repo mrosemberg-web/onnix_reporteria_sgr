@@ -229,6 +229,8 @@ export default async function Proyeccion({ searchParams }: { searchParams: Promi
                     {i.fecha ? fecha(i.fecha) : "–"}
                     <span className="debil"> {i.base === "fin_testing" ? "fin de testing" : "fin de desarrollo"}</span>
                     {i.estimada && <span className="etiqueta e-leve" style={{ marginLeft: 6 }}>Estimada</span>}
+                    {i.fechaAbierta && i.destino !== "entregado" && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }}
+                      title="El SGR sigue en pausa: la fecha se calcula con la pausa hasta el corte y se va a seguir corriendo hasta que se retome">Pausa en curso</span>}
                     {i.corrido && <span className="etiqueta e-neutro" style={{ marginLeft: 6 }}
                       title={i.motivoCorrido === "mes_cerrado" ? `La fecha de corte del mes (${fecha(p.hasta)}) ya pasó y no se entregó` : `Posterior a la fecha de corte del mes (${fecha(p.hasta)})`}>
                       {i.motivoCorrido === "mes_cerrado" ? "Pasa al mes siguiente: mes cerrado" : "Pasa al mes siguiente"}</span>}

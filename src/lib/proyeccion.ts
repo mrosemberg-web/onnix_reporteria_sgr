@@ -55,6 +55,8 @@ export type ItemProyeccion = {
   desestimado: boolean;
   /** Presupuesto × tarifa menos el importe de la planilla, si es positivo. */
   descuento: number | null;
+  /** Sigue en pausa: la fecha que manda se va a seguir corriendo hasta que se retome. */
+  fechaAbierta: boolean;
   /** Pasó al mes siguiente por la fecha de corte del mes. */
   corrido: boolean;
   /** posterior: su fecha es posterior al corte. mes_cerrado: el corte ya pasó y no se entregó. */
@@ -85,7 +87,7 @@ function desdeEnCurso(a: Analisis, corte: string, anioCorte: number, fer: Set<st
     id_req: a.id_req, asunto: a.asunto, escenario: esc, origen: "en_curso" as const, fase: a.fase as "desa" | "test" | null, area: a.equipo,
     situacion: `${a.fase === "desa" ? "Desarrollo" : "Testing"}: ${a.estado ?? ""}`, responsable: a.nombre ?? a.usuario,
     usuarios: [a.usuario], lider: a.lider, tipo: a.tipo_servicio, base: base as ItemProyeccion["base"], desa, test,
-    desestimado: false, descuento: null, corrido: false,
+    desestimado: false, descuento: null, corrido: false, fechaAbierta: a.fechaAbierta,
   };
   const finalizado = a.etapa === "finalizado";
   const mesCorte = corte.slice(0, 7);
@@ -178,7 +180,7 @@ export async function proyeccion(f: FiltrosSeguimiento, { hasta: hastaPedido }: 
       return {
         id_req: h.id_req, asunto: h.asunto, escenario: esc, origen: "implementado" as const, fase: null, area: h.departamento,
         situacion: h.desestimado ? "Desestimado por el cliente (cuenta como entregado)" : "Implementado",
-        desestimado: h.desestimado, descuento: h.desestimado && h.descuento > 0 ? h.descuento : null, corrido: false,
+        desestimado: h.desestimado, descuento: h.desestimado && h.descuento > 0 ? h.descuento : null, corrido: false, fechaAbierta: false,
         responsable: usuarios.join(" / "), usuarios, lider: usuarios.map((u) => lideres.get(u)).find(Boolean) ?? null,
         tipo: h.tipo_requerimiento, fecha: h.fecha_fin, base: esc === 2 ? "fin_desarrollo" as const : "fin_testing" as const,
         estimada: false, destino: "entregado" as const, mes: corte.slice(0, 7), desa: h.desa, test: h.test,

@@ -181,22 +181,21 @@ Todas las listas de SGR tienen un buscador por SGR, asunto, persona y área, igu
 
 Se mide en **días hábiles** posteriores a la **entrega estimada original** y la fecha de corte (o la fecha en que la fase se dio por finalizada), y se reparte en causas en este orden:
 
-1. **Pausas**: horas pausadas de la fase más otras horas pausadas, ÷ 8, en días hábiles. Corren la entrega estimada a la **entrega corregida**, que se calcula sumando esos días hábiles. Las horas pausadas ya incluyen la detención actual. Si hoy el SGR está detenido, la parte de las pausas que corresponde a esa detención (días hábiles en el estado actual) se atribuye a su motivo:
-   - **espera del cliente**: *Aguardando retorno FPJ*, *Pendiente de Pruebas UAT* o *Devuelto por Cambios en Requerimiento*;
-   - **devolución de testing**: *Devuelto al Desarrollador…*;
-   - **pausa sin motivo**: *Testing en Pausa*.
+1. **Pausas anteriores**: horas pausadas ya registradas (pausas de la fase más otras pausas) ÷ 8, en días hábiles. El sistema de gestión las registra recién cuando el SGR cambia de estado.
+2. **Pausa en curso**: si hoy el SGR está detenido, cuentan los días hábiles desde la fecha del estado hasta el corte de la planilla, atribuidos a su motivo:
+   - espera del cliente: *Aguardando retorno FPJ*, *Pendiente de Pruebas UAT* o *Devuelto por Cambios en Requerimiento*;
+   - devolución de testing: *Devuelto al Desarrollador…*;
+   - pausa sin motivo: *Testing en Pausa*.
 
-   El resto queda como **pausas anteriores**.
-2. **Devoluciones de testing**: en testing, si el SGR tuvo devoluciones al desarrollador, el resto del atraso se atribuye a ellas.
-3. **Ejecución**: lo que queda. Se subdivide en *más horas que las presupuestadas* (subestimación o ineficiencia), *ritmo por debajo del plan* (menos horas que las presupuestadas pero la fecha vencida) y *no iniciado o en cola*.
+   Como todavía no tiene fecha de fin, la entrega corregida cuenta lo que faltaba del plan al empezar la pausa a partir del corte y se marca «o después». Si ya estaba vencido al pausarse, queda vencido. En la Proyección esos SGR llevan la marca «Pausa en curso».
+3. **Devoluciones de testing**: en testing, si el SGR tuvo devoluciones al desarrollador, el resto del atraso se atribuye a ellas.
+4. **Ejecución**: lo que queda. Se subdivide en *más horas que las presupuestadas* (subestimación o ineficiencia), *ritmo por debajo del plan* (menos horas que las presupuestadas pero la fecha vencida) y *no iniciado o en cola*.
 
 Los SGR en análisis o presupuesto (incluido *Presupuesto Aprobado*) **no cuentan como vencidos**: son casos en que se vuelve a analizar el alcance y cambia el presupuesto. Se muestran como «En análisis de alcance».
 
-Si un SGR detenido tiene menos horas pausadas que los días hábiles que lleva en el estado, se marca **Revisar pausa** y la lectura lo advierte, porque ese tiempo sin registrar termina contándose como ejecución.
-
 **SGR no iniciados.** Un SGR sin fecha de inicio ni entrega estimada, que no haya terminado su fase, se considera **no iniciado**. Si le falta la fecha de inicio pero tiene entrega estimada, se trata como iniciado y la lectura lo marca como dato a revisar. Es el caso de los que están en análisis, en presupuesto, en cola o esperando al cliente para arrancar. Como no tienen plazo corriendo:
 
-- no suman atraso ni disparan «Revisar pausa»;
+- no suman atraso ni pausa en curso;
 - sus horas cargadas (análisis o presupuesto) no se comparan con el presupuesto ni cuentan como excedidas, sino que se informan aparte como «horas antes de iniciar»;
 - si esperan al cliente, van en la etapa «Esperando al cliente, sin iniciar», separados de los que esperan con el SGR en curso;
 - en la Proyección forman el bloque «No iniciados», distinto de «Sin fecha vigente».

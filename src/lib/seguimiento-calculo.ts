@@ -4,15 +4,14 @@
 // Atraso: días hábiles posteriores a la entrega estimada ORIGINAL hasta la fecha de
 // corte (o la fecha en que la fase se dio por finalizada). Se descompone en causas:
 //
-//   1. Pausas: horas pausadas de la fase (pausas de la fase + otras pausas) ÷ 8,
-//      en días hábiles. Corren la entrega a la "entrega corregida". Las horas
-//      pausadas incluyen la detención actual. Si hoy el SGR está detenido, la parte
-//      de esas pausas que corresponde a la detención actual (días hábiles en el
-//      estado) se atribuye a su motivo: espera del cliente, devolución de testing o
-//      pausa sin motivo. El resto queda como "pausas anteriores".
-//   2. En testing, si el SGR tuvo devoluciones al desarrollador, el atraso restante se
+//   1. Pausas anteriores: horas pausadas ya registradas (pausas de la fase + otras) ÷ 8, en días
+//      hábiles. El sistema las registra recién cuando el SGR cambia de estado.
+//   2. Pausa en curso: si hoy el SGR está detenido (esperando al cliente, devuelto al desarrollador
+//      o en pausa), los días hábiles desde la fecha del estado hasta el corte de la planilla, por su
+//      motivo. Todavía no tiene fecha de fin: la entrega corregida se sigue corriendo.
+//   3. En testing, si el SGR tuvo devoluciones al desarrollador, el atraso restante se
 //      atribuye a esas devoluciones (el tester espera la corrección del desarrollador).
-//   3. Ejecución: el resto del atraso, que no explican las anteriores.
+//   4. Ejecución: el resto del atraso, que no explican las anteriores.
 //
 // Los SGR en análisis o presupuesto (incluido "Presupuesto Aprobado") no cuentan como
 // vencidos: son casos en que se vuelve a analizar el alcance y cambia el presupuesto.
@@ -53,13 +52,13 @@ export function etapaDe(estado: string | null): Etapa {
 export type Causa = "pausas" | "cliente" | "devoluciones" | "pausa" | "ejecucion";
 export const CAUSAS: Record<Causa, { nombre: string; color: string; externa: boolean; ayuda: string }> = {
   pausas: { nombre: "Pausas anteriores", color: "#8a94a8", externa: true,
-    ayuda: "Días que el sistema corrió la entrega por pausas de estados anteriores (8 h pausadas = 1 día)." },
+    ayuda: "Días que el sistema corrió la entrega por pausas ya registradas en estados anteriores (8 h pausadas = 1 día)." },
   cliente: { nombre: "Espera del cliente", color: "var(--leve)", externa: true,
-    ayuda: "Pausa de la detención actual esperando al cliente: Aguardando retorno FPJ, pruebas UAT o cambios en el requerimiento." },
+    ayuda: "Pausa en curso esperando al cliente (Aguardando retorno FPJ, pruebas UAT o cambios en el requerimiento): días hábiles desde el inicio de la pausa hasta el corte de la planilla." },
   devoluciones: { nombre: "Devoluciones de testing", color: "var(--test)", externa: false,
     ayuda: "Atraso por devoluciones de testing al desarrollador (actualización de fuentes o errores encontrados)." },
   pausa: { nombre: "Pausa sin motivo registrado", color: "#a58f6a", externa: false,
-    ayuda: "Pausa de la detención actual en un estado que no indica si se espera al cliente (Testing en Pausa)." },
+    ayuda: "Pausa en curso en un estado que no indica si se espera al cliente (Testing en Pausa), hasta el corte de la planilla." },
   ejecucion: { nombre: "Ejecución", color: "var(--mal)", externa: false,
     ayuda: "Atraso que no explican las pausas ni las devoluciones: lentitud o subestimación." },
 };
@@ -104,8 +103,10 @@ export type Analisis = FilaSeguimiento & {
   /** Sub-diagnóstico del atraso por ejecución */
   ejecucion: Ejecucion | null;
   horasExcedidas: number;
-  /** Días hábiles de la detención actual que no figuran en las horas pausadas (dato a revisar). */
-  pausaSinRegistrar: number;
+  /** Días hábiles de la pausa actual (desde la fecha del estado hasta el corte), todavía sin registrar. */
+  pausaEnCurso: number;
+  /** Está detenido: la entrega corregida se sigue corriendo mientras siga en pausa. */
+  fechaAbierta: boolean;
   /** Tiene fecha de inicio o entrega estimada (o ya terminó su fase). Sin eso no hay plazo corriendo. */
   iniciado: boolean;
   /** Dato a revisar: tiene entrega estimada pero le falta la fecha de inicio. */
@@ -151,11 +152,6 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   const E = fecha(f.entrega_estimada);
   const I = fecha(f.fecha_inicio);
   const S = fecha(f.fecha_estado);
-  // Pausas de la fase en días hábiles (8 h = 1 día) y entrega corregida.
-  const diasPausa = (f.horas_pausadas_fase + f.otras_horas_pausadas) / 8;
-  const corrido = Math.round(diasPausa);
-  const N = E != null ? sumarHabiles(E, corrido, fer) : null;
-  const entregaCorregida = N != null ? iso(N) : null;
   const etapaEstado: Etapa = f.id_req === "0" ? "sin_asignacion" : etapaDe(f.estado);
   // No iniciado: sin fecha de inicio, sin entrega estimada y sin haber terminado la fase. No hay plazo corriendo.
   // Si falta la fecha de inicio pero hay entrega estimada, el plazo existe: se trata como iniciado y se avisa.
@@ -170,10 +166,28 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   const horasAntesDeIniciar = iniciado ? 0 : f.horas_trab;
   const diasEnEstado = S != null ? habilesDespues(S, C, fer) : null;
 
-  const detenido = etapa === "cliente" || etapa === "devuelto" || etapa === "pausa";
-  const pausaSinRegistrar = detenido && iniciado && S != null
-    ? Math.max(0, Math.floor(habilesDespues(S, C, fer) - diasPausa)) : 0;
-  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaSinRegistrar, entregaCorregida, iniciado, inicioFaltante, horasAntesDeIniciar,
+  // Pausas ya registradas (de estados anteriores): 8 h = 1 día hábil.
+  const corrido = Math.round((f.horas_pausadas_fase + f.otras_horas_pausadas) / 8);
+  const Ereg = E != null ? sumarHabiles(E, corrido, fer) : null;
+
+  // Pausa en curso: el sistema registra las horas pausadas recién cuando el SGR cambia de estado.
+  // Si hoy está detenido (y ya inició), la pausa corre desde la fecha del estado hasta el corte
+  // de la planilla, y todavía no tiene fecha de fin.
+  const detenido = (etapa === "cliente" || etapa === "devuelto" || etapa === "pausa") && iniciado && S != null;
+  const pausaEnCurso = detenido ? diasEnEstado ?? 0 : 0;
+
+  // Entrega corregida. Con pausa en curso, lo que faltaba del plan al empezar la pausa recién
+  // corre cuando se retome, así que se cuenta desde el corte; si ya estaba vencido al pausarse,
+  // queda en la fecha vencida.
+  let N = Ereg;
+  if (detenido && Ereg != null) {
+    const pendiente = Ereg > S! ? habilesDespues(S!, Ereg, fer) : 0;
+    N = pendiente > 0 ? sumarHabiles(C, pendiente, fer) : Ereg;
+  }
+  const entregaCorregida = N != null ? iso(N) : null;
+
+  const base = { ...f, lider, etapa, diasEnEstado, causas, consumo, horasExcedidas, pausaEnCurso, fechaAbierta: detenido && E != null,
+    entregaCorregida, iniciado, inicioFaltante, horasAntesDeIniciar,
     devUsuario: null, devNombre: f.desarrollador ?? null, devExterno: (f.importe_desa ?? 0) === 0 };
   if (etapa === "sin_asignacion") {
     return { ...base, situacion: "sin_asignacion", atraso: null, causaPrincipal: null, avance: null, ejecucion: null };
@@ -183,7 +197,7 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   if (I != null && E != null && E >= I) {
     const plan = Math.max(1, habiles(I, E, fer));
     const hasta = S != null && etapa === "finalizado" ? Math.min(S, C) : C;
-    avance = Math.max(0, habiles(I, hasta, fer) - corrido) / plan;
+    avance = Math.max(0, habiles(I, hasta, fer) - corrido - pausaEnCurso) / plan;
   }
 
   if (E == null) {
@@ -199,24 +213,23 @@ export function analizar(f: FilaSeguimiento, corteIso: string, lideres: Set<stri
   const atraso = habilesDespues(E, ref, fer);
   let resto = atraso;
 
-  // 1. Pausas registradas (ya incluyen la detención actual).
-  const pausas = Math.min(resto, corrido);
-  resto -= pausas;
-  // La parte que corresponde a la detención actual se atribuye a su motivo.
-  let actual = 0;
-  if (!finalizado && S != null && (etapa === "cliente" || etapa === "devuelto" || etapa === "pausa")) {
-    actual = Math.min(pausas, habilesDespues(S, C, fer));
+  // 1. Pausas registradas de estados anteriores.
+  causas.pausas = Math.min(resto, corrido);
+  resto -= causas.pausas;
+  // 2. Pausa en curso, atribuida a su motivo (cliente, devolución de testing o pausa sin motivo).
+  if (pausaEnCurso > 0 && resto > 0) {
+    const actual = Math.min(resto, pausaEnCurso);
     causas[etapa === "cliente" ? "cliente" : etapa === "devuelto" ? "devoluciones" : "pausa"] += actual;
+    resto -= actual;
   }
-  causas.pausas = pausas - actual;
 
-  // 2. En testing, el resto se debe a las devoluciones al desarrollador, si las hubo.
+  // 3. En testing, el resto se debe a las devoluciones al desarrollador, si las hubo.
   if (resto > 0 && f.fase === "test" && (f.devoluciones ?? 0) > 0) {
     causas.devoluciones += resto;
     resto = 0;
   }
 
-  // 3. Ejecución.
+  // 4. Ejecución.
   causas.ejecucion = resto;
   const ejecucion: Ejecucion | null = resto <= 0 ? null
     : f.horas_trab === 0 || etapa === "cola" ? "sin_iniciar"
@@ -265,7 +278,9 @@ export type ResumenGrupo = {
   horasExcedidas: number;
   sinPlan: number;
   enAnalisis: number;
-  pausasSinRegistrar: number;
+  /** SGR detenidos hoy y días hábiles de pausa en curso acumulados. */
+  pausasEnCurso: number;
+  diasPausaEnCurso: number;
   importe: number;
 };
 
@@ -274,7 +289,7 @@ export function resumir(items: Analisis[]): ResumenGrupo {
     sgr: 0, porEtapa: Object.fromEntries(Object.keys(ETAPAS).map((k) => [k, 0])) as Record<Etapa, number>,
     atrasados: 0, diasAtraso: 0, causas: { pausas: 0, cliente: 0, devoluciones: 0, pausa: 0, ejecucion: 0 },
     esperandoCliente: 0, esperandoClienteSinIniciar: 0, noIniciados: 0, inicioFaltante: 0, horasAntesDeIniciar: 0, devoluciones: 0, sgrConDevolucion: 0, devueltosAhora: 0, horasAyer: 0, horasTrab: 0, horasPresu: 0,
-    trabConPresu: 0, presuConTrab: 0, excedidos: 0, horasExcedidas: 0, sinPlan: 0, enAnalisis: 0, pausasSinRegistrar: 0, importe: 0,
+    trabConPresu: 0, presuConTrab: 0, excedidos: 0, horasExcedidas: 0, sinPlan: 0, enAnalisis: 0, pausasEnCurso: 0, diasPausaEnCurso: 0, importe: 0,
   };
   for (const a of items) {
     r.horasAyer += a.horas_ayer;
@@ -284,7 +299,7 @@ export function resumir(items: Analisis[]): ResumenGrupo {
     if (a.situacion === "atrasado") r.atrasados++;
     if (a.situacion === "sin_plan") r.sinPlan++;
     if (a.situacion === "replanificacion") r.enAnalisis++;
-    if (a.pausaSinRegistrar > 1) r.pausasSinRegistrar++;
+    if (a.pausaEnCurso > 0) { r.pausasEnCurso++; r.diasPausaEnCurso += a.pausaEnCurso; }
     if (a.atraso && a.etapa !== "finalizado") {
       r.diasAtraso += a.atraso;
       for (const c of ORDEN_CAUSAS) r.causas[c] += a.causas[c];

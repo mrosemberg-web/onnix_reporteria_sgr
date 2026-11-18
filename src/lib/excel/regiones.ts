@@ -284,7 +284,7 @@ const colsDetalleSeg = cols(
   ["devoluciones", "Devoluciones al desarrollador", "entero"], ["trab", "Horas trabajadas", "horas"],
   ["presu", "Horas presupuestadas", "horas"], ["antes_iniciar", "Horas antes de iniciar", "horas"], ["consumo", "Horas usadas", "pct"], ["excedidas", "Horas excedidas", "horas"],
   ["pausadas", "Horas pausadas de la fase", "horas"], ["otras", "Otras horas pausadas", "horas"],
-  ["sin_registrar", "Días detenido sin pausa registrada", "entero"], ["importe", "Importe considerado (Gs.)", "gs"],
+  ["pausa_en_curso", "Pausa en curso (días hábiles hasta el corte)", "entero"], ["fecha_abierta", "Entrega sujeta a la pausa en curso", "texto"], ["importe", "Importe considerado (Gs.)", "gs"],
 );
 const filaSeg = (a: Analisis) => ({
   sgr: a.id_req, fase: FASE[a.fase], asunto: a.asunto, responsable: a.nombre ?? a.usuario, usuario: a.usuario, lider: a.lider,
@@ -297,7 +297,7 @@ const filaSeg = (a: Analisis) => ({
   c_pausa: a.atraso ? a.causas.pausa : null, c_ejec: a.atraso ? a.causas.ejecucion : null,
   diag: a.ejecucion ? EJECUCION[a.ejecucion].nombre : null, devoluciones: a.devoluciones, trab: a.horas_trab,
   presu: a.horas_presu, consumo: a.consumo, excedidas: a.horasExcedidas || null, pausadas: a.horas_pausadas_fase,
-  otras: a.otras_horas_pausadas, sin_registrar: a.pausaSinRegistrar || null, importe: importePropio(a),
+  otras: a.otras_horas_pausadas, pausa_en_curso: a.pausaEnCurso || null, fecha_abierta: a.fechaAbierta ? "Sí" : null, importe: importePropio(a),
 });
 const ORDEN_SIT = { atrasado: 0, vence_pronto: 1, en_plazo: 2, fin_tarde: 3, replanificacion: 4, sin_plan: 5, fin_a_tiempo: 6, sin_asignacion: 7 };
 const ordenar = (l: Analisis[]) => [...l].sort((a, b) => ORDEN_SIT[a.situacion] - ORDEN_SIT[b.situacion] || (b.atraso ?? 0) - (a.atraso ?? 0));
@@ -556,7 +556,8 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
           ["situacion", "Situación", "texto"], ["responsable", "Responsable", "texto"], ["lider", "Líder", "texto"], ["tipo", "Tipo de servicio", "texto"],
           ["fecha", "Fecha que manda", "fecha"], ["base", "Fecha de", "texto"], ["estimada", "Fecha estimada", "texto"],
           ["desa", "Desarrollo (Gs.)", "gs"], ["test", "Testing (Gs.)", "gs"], ["total", "Total (Gs.)", "gs"], ["origen", "Origen", "texto"],
-          ["desestimado", "Desestimado", "texto"], ["descuento", "Descuento (Gs.)", "gs"], ["corrido", "Pasa al mes siguiente por la fecha de corte", "texto"]),
+          ["desestimado", "Desestimado", "texto"], ["descuento", "Descuento (Gs.)", "gs"], ["corrido", "Pasa al mes siguiente por la fecha de corte", "texto"],
+          ["abierta", "Pausa en curso (fecha se sigue corriendo)", "texto"]),
         filas: [...p.items].sort((a, b) => orden[a.destino] - orden[b.destino] || String(a.mes ?? "").localeCompare(String(b.mes ?? ""))).map((i) => ({
           destino: destino(i), sgr: i.id_req, asunto: i.asunto, escenario: ESCENARIOS[i.escenario], situacion: i.situacion, responsable: i.responsable,
           lider: i.lider, tipo: i.tipo, fecha: i.fecha, base: i.base === "fin_testing" ? "Fin de testing" : "Fin de desarrollo",
@@ -564,6 +565,7 @@ function paginaProyeccion(f: FiltrosSeguimiento, hasta?: string): DefRegion[] {
           origen: i.origen === "implementado" ? "Implementado" : "En curso",
           desestimado: i.desestimado ? "Sí" : "No", descuento: i.descuento,
           corrido: i.corrido ? (i.motivoCorrido === "mes_cerrado" ? "Sí, mes cerrado" : "Sí, posterior al corte") : "No",
+          abierta: i.fechaAbierta ? "Sí" : "No",
         })),
       });
     } },
