@@ -78,18 +78,10 @@ export function BarrasAcumulado({
                 base += v;
                 const h = Math.max(0, y0 - y1);
                 return (
-                  <g key={k}>
-                    <rect x={xb(i) - bw / 2} y={y1} width={bw} height={h} fill={series[k]?.color ?? "var(--desa)"}
-                      rx={k === d.segmentos.length - 1 ? 3 : 0} />
-                    {v > 0 && h > 18 && (
-                      <text x={xb(i)} y={y1 + 14} textAnchor="middle" style={{ fill: series[k]?.colorTexto ?? "var(--superficie)", fontWeight: 650 }}>{v}</text>
-                    )}
-                  </g>
+                  <rect key={k} x={xb(i) - bw / 2} y={y1} width={bw} height={h} fill={series[k]?.color ?? "var(--desa)"}
+                    rx={k === d.segmentos.length - 1 ? 3 : 0} />
                 );
               })}
-              {total(d) > 0 && d.segmentos.some((v) => v > 0 && yv(0) - yv(v) <= 18) && (
-                <text x={xb(i)} y={yv(total(d)) - 6} textAnchor="middle" style={{ fill: "var(--tinta)", fontWeight: 600 }}>{total(d)}</text>
-              )}
               {i % etiquetaCada === 0 && <text x={xb(i)} y={H - 10} textAnchor="middle">{d.etiqueta}</text>}
             </g>
           );
@@ -100,6 +92,36 @@ export function BarrasAcumulado({
             <title>{`Acumulado a ${d.etiqueta}: ${d.acumulado}`}</title>
           </circle>
         ))}
+        {/* Valores de cada segmento, encima de la línea para que siempre se lean. Cada número es el de
+            su propio segmento: adentro si entra; si no, arriba de la barra (el de más arriba) o al costado. */}
+        {datos.map((d, i) => {
+          const bw = Math.min(banda * 0.62, 40);
+          const tenue = resaltarUltimo && i === ult;
+          const ultimoConValor = d.segmentos.reduce((u, v, k) => (v > 0 ? k : u), -1);
+          let base = 0;
+          return (
+            <g key={i} opacity={tenue ? 0.6 : 1} style={{ pointerEvents: "none" }}>
+              {d.segmentos.map((v, k) => {
+                const y0 = yv(base), y1 = yv(base + v);
+                base += v;
+                const h = y0 - y1;
+                if (v <= 0) return null;
+                const color = series[k]?.color ?? "var(--desa)";
+                if (h > 18) {
+                  return (
+                    <text key={k} x={xb(i)} y={y1 + h / 2 + 4} textAnchor="middle" className="valor-segmento"
+                      style={{ fill: series[k]?.colorTexto ?? "var(--superficie)", stroke: color }}>{v}</text>
+                  );
+                }
+                return k === ultimoConValor ? (
+                  <text key={k} x={xb(i)} y={y1 - 6} textAnchor="middle" className="valor-segmento fuera" style={{ fill: color }}>{v}</text>
+                ) : (
+                  <text key={k} x={xb(i) + bw / 2 + 3} y={y1 + h / 2 + 4} textAnchor="start" className="valor-segmento fuera chico" style={{ fill: color }}>{v}</text>
+                );
+              })}
+            </g>
+          );
+        })}
       </svg>
       <div className="leyenda">
         {series.map((s) => <span key={s.nombre}><i style={{ background: s.color }} />{s.nombre}</span>)}

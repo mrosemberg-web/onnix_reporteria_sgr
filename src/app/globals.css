@@ -351,3 +351,8 @@ td.nombre { white-space: nowrap; }
 .buscador input[type="search"] { min-width: 280px; }
 .buscador .debil { font-size: 0.85rem; padding-bottom: 8px; }
 [hidden] { display: none !important; }
+
+/* Valores de los segmentos en barras apiladas: con halo para leerse sobre la línea de acumulado. */
+.grafico text.valor-segmento { font-weight: 700; paint-order: stroke; stroke-width: 3px; stroke-linejoin: round; }
+.grafico text.valor-segmento.fuera { stroke: var(--superficie) !important; }
+.grafico text.valor-segmento.chico { font-size: 10px; }
